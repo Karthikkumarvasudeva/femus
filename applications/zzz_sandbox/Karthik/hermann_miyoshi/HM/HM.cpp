@@ -452,13 +452,13 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem *
     else if (!strcmp(SolName, "sxy")) {
       Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     Value = sxy -> value(x);
-                dirichlet = false;
+                dirichlet = true;
   }
     else if (!strcmp(SolName, "syy")) {
       Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     Value = syy -> value(x);
                 // // // Value = analytical_syy_solution.value(x);
-                dirichlet =true ;
+                dirichlet = true ;
   }
 
   // // // double value = 0.;  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -551,7 +551,7 @@ int main(int argc, char** args) {
   // ======= Mesh, Coarse, file - BEGIN =========================
  MultiLevelMesh mlMsh;
 
-  system_biharmonic_HM_D._mesh_files.push_back("square_-0p5-0p5x-0p5-0p5_divisions_4x4.med");
+  system_biharmonic_HM_D._mesh_files.push_back("square_-0p5-0p5x-0p5-0p5_divisions_2x2.med");
   const std::string relative_path_to_build_directory = "../../../../../";
   const std::string mesh_file = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";
   system_biharmonic_HM_D._mesh_files_path_relative_to_executable.push_back(mesh_file);
@@ -628,6 +628,7 @@ int main(int argc, char** args) {
       system.AddSolutionToSystemPDE("syy");
       system.SetAssembleFunction(system_biharmonic_HM_D._assemble_function);
 
+                  system.SetOuterSolver(PREONLY);
       system.init();
       system.MGsolve();
 

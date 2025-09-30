@@ -359,6 +359,57 @@ private:
 };
 
 
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_u_1 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 1.;
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 0.;
+        solGrad[1] = 0.;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+    static constexpr double a = 0.001;
+};
+
+
+
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_0 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 0.;
+        solGrad[1] = 0.;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+    static constexpr double a = 0.001;
+};
+
+
 
 
 }
@@ -471,15 +522,19 @@ int main(int argc, char** args) {
 
   Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian  <>   system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_f<> Function_Zero_on_boundary_7_deviatoric_f;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_f<> system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_f;
+
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_0<> system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0;
+
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_1 <>   system_biharmonic_HM_function_zero_on_boundary_u_1;
 
 // // //   mlSol.set_analytical_function("f", &Function_Zero_on_boundary_7_deviatoric_f);
 
 
 
 
-  system_biharmonic_HM._assemble_function_for_rhs   = & system_biharmonic_HM_function_zero_on_boundary_u_dr;
-  system_biharmonic_HM._true_solution_function      = & system_biharmonic_HM_function_zero_on_boundary_1;
+  system_biharmonic_HM._assemble_function_for_rhs   = & system_biharmonic_HM_function_zero_on_boundary_u_1;
+  system_biharmonic_HM._true_solution_function      = & system_biharmonic_HM_function_zero_on_boundary_u_1;
 
 
 
@@ -496,7 +551,7 @@ int main(int argc, char** args) {
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 4;
+  unsigned maxNumberOfMeshes = 5;
 
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
 
@@ -544,37 +599,37 @@ int main(int argc, char** args) {
       MultiLevelSolution mlSol(&mlMsh);
 
       mlSol.AddSolution("u", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("u", &system_biharmonic_HM_function_zero_on_boundary_1);
+      mlSol.set_analytical_function("u", &system_biharmonic_HM_function_zero_on_boundary_u_1);
 
       mlSol.AddSolution("sxx", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx);
+      mlSol.set_analytical_function("sxx", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("sxy", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy);
+      mlSol.set_analytical_function("sxy", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("syy", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("syy", &system_biharmonic_HM_function_zero_on_boundary_syy);
+      mlSol.set_analytical_function("syy", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("ud", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("ud", &system_biharmonic_HM_function_zero_on_boundary_u_d);
+      mlSol.set_analytical_function("ud", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("sxxd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxxd);
+      mlSol.set_analytical_function("sxxd", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("sxyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxyd);
+      mlSol.set_analytical_function("sxyd", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("syyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
+      mlSol.set_analytical_function("syyd", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
       mlSol.AddSolution("q", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("q", &system_biharmonic_HM_function_zero_on_boundary_q);
+      mlSol.set_analytical_function("q", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0);
 
           l2Norm_u_dr_vs_u[i].resize(feOrder.size());
     semiNorm_u_dr_vs_u[i].resize(feOrder.size());
 
       mlSol.AddSolution("u_dr", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("u_dr", &system_biharmonic_HM_function_zero_on_boundary_u_dr);
+      mlSol.set_analytical_function("u_dr", &system_biharmonic_HM_function_zero_on_boundary_u_1);
 
 
 
@@ -597,7 +652,7 @@ int main(int argc, char** args) {
       mlSol.GenerateBdc("sxyd", "Steady", &ml_prob);
       mlSol.GenerateBdc("syyd", "Steady", &ml_prob);
 
-      mlSol.GenerateBdc("u_dr", "Steady", &ml_prob);
+//       mlSol.GenerateBdc("u_dr", "Steady", &ml_prob);
 
 
       mlSol.GenerateBdc("q", "Steady", &ml_prob);
@@ -631,20 +686,20 @@ auto put_err = [&](const char* name, Math::Function<double>* exact,
         H1[i][j] = norm.second;
       };
 
-      put_err("u",   &system_biharmonic_HM_function_zero_on_boundary_1,l2Norm_u,   semiNorm_u);
-      put_err("sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx, l2Norm_sxx, semiNorm_sxx);
-      put_err("sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy, l2Norm_sxy, semiNorm_sxy);
-      put_err("syy", &system_biharmonic_HM_function_zero_on_boundary_syy, l2Norm_syy, semiNorm_syy);
+      put_err("u",   &system_biharmonic_HM_function_zero_on_boundary_u_1,l2Norm_u,   semiNorm_u);
+      put_err("sxx", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0, l2Norm_sxx, semiNorm_sxx);
+      put_err("sxy", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0, l2Norm_sxy, semiNorm_sxy);
+      put_err("syy", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0, l2Norm_syy, semiNorm_syy);
 
-      put_err("ud",   &system_biharmonic_HM_function_zero_on_boundary_u_d,   l2Norm_ud,   semiNorm_ud);
-      put_err("sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxx,  l2Norm_sxxd, semiNorm_sxxd);
-      put_err("sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxy,  l2Norm_sxyd, semiNorm_sxyd);
-      put_err("syyd", &system_biharmonic_HM_function_zero_on_boundary_syy,  l2Norm_syyd, semiNorm_syyd);
+      put_err("ud",   &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0,   l2Norm_ud,   semiNorm_ud);
+      put_err("sxxd", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0,  l2Norm_sxxd, semiNorm_sxxd);
+      put_err("sxyd", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0,  l2Norm_sxyd, semiNorm_sxyd);
+      put_err("syyd", &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0,  l2Norm_syyd, semiNorm_syyd);
 
-      put_err("q",    &system_biharmonic_HM_function_zero_on_boundary_q,    l2Norm_q,    semiNorm_q);
+      put_err("q",    &system_biharmonic_HM_Function_Zero_on_boundary_7_deviatoric_0,    l2Norm_q,    semiNorm_q);
 
 
-     put_err("u", &system_biharmonic_HM_function_zero_on_boundary_u_dr, l2Norm_u_dr_vs_u, semiNorm_u_dr_vs_u);
+//      put_err("u", &system_biharmonic_HM_function_zero_on_boundary_u_dr, l2Norm_u_dr_vs_u, semiNorm_u_dr_vs_u);
 
 
       // Output VTK
@@ -690,9 +745,9 @@ auto put_err = [&](const char* name, Math::Function<double>* exact,
 
   print_error(l2Norm_syy, "L2 ERROR for q");
   print_error(semiNorm_syy, "H1 ERROR for q");
-
-  print_error(l2Norm_u_dr_vs_u, "L2 ERROR for u vs u_dr");
-  print_error(semiNorm_u_dr_vs_u, "H1 ERROR for u vs u_dr");
+// // /*
+// //   print_error(l2Norm_u_dr_vs_u, "L2 ERROR for u vs u_dr");
+// //   print_error(semiNorm_u_dr_vs_u, "H1 ERROR for u vs u_dr");*/
 
 
   return 0;

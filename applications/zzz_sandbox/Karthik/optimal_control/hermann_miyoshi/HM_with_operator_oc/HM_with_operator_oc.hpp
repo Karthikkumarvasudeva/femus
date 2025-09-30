@@ -1056,7 +1056,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   KK->zero(); // Set to zero all the entries of the Global Matrix
 
 
-double alpha = 0.001 ;
+double alpha = 0.1 ;
 double nu =  0.3 /* Poisson ratio value */;
 
 

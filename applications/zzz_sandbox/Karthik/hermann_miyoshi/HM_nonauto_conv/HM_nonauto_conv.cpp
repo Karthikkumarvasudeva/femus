@@ -282,19 +282,19 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem *
       // // // Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     // // // Value = sxx -> value(x);
               Value = analytical_sxx_solution.value(x);
-              dirichlet = false;
+              dirichlet = true;
   }
     else if (!strcmp(SolName, "sxy")) {
       // // // Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     // // // Value = sxy -> value(x);
                 Value = analytical_sxy_solution.value(x);
-                dirichlet = false;
+                dirichlet = true;
   }
     else if (!strcmp(SolName, "syy")) {
       // // // Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     // // // Value = syy -> value(x);
                 Value = analytical_syy_solution.value(x);
-                dirichlet = false;
+                dirichlet = true;
   }
 
   // // // double value = 0.;  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
