@@ -255,7 +255,7 @@ static void natural_loop_2d3dU(const MultiLevelProblem *    ml_prob,
 
 //========= BOUNDARY_IMPLEMENTATION_U - END ==================
 
-
+/*
 //========= BOUNDARY_IMPLEMENTATION_Sxx - BEGIN ==================
 
 static void natural_loop_1dSxx(const MultiLevelProblem *    ml_prob,
@@ -301,7 +301,7 @@ static void natural_loop_1dSxx(const MultiLevelProblem *    ml_prob,
 
                  unsigned int i_vol = msh->GetLocalFaceVertexIndex(iel, jface, i);
 
-                 Res[i_vol] +=  grad_sxx_dot_n /* * phi[node] = 1. */;
+                 Res[i_vol] +=  grad_sxx_dot_n ;
 
                          }
 
@@ -325,7 +325,7 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
                        const unsigned solFEType_sxx,
                        std::vector< double > & Res,
                        //-----------
-                       std::vector < std::vector < /*const*/ elem_type_templ_base<real_num, real_num_mov> *  > >  elem_all,
+                       std::vector < std::vector < elem_type_templ_base<real_num, real_num_mov> *  > >  elem_all,
                        const unsigned dim,
                        const unsigned space_dim,
                        const unsigned max_size
@@ -387,7 +387,7 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
          //while here we pass the FACE ELEMENT CENTER coordinates.
          // So, if we use this for enforcing space-dependent Dirichlet or Neumann values, we need to be careful!
 
-             if ( !(is_dirichlet) /* &&  (grad_u_dot_n != 0.)*/ ) {  //dirichlet == false and nonhomogeneous Neumann
+             if ( !(is_dirichlet) ) {  //dirichlet == false and nonhomogeneous Neumann
 
     unsigned n_dofs_face_sxx = msh->GetElementFaceDofNumber(iel, jface, solFEType_sxx);
 
@@ -448,7 +448,7 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
 
                  unsigned int i_vol = msh->GetLocalFaceVertexIndex(iel, jface, i_bdry);
 
-                 Res[i_vol] +=  weight_iqp_bdry * grad_sxx_dot_n_qp /*grad_u_dot_n*/  * phi_sxx_bdry[i_bdry];
+                 Res[i_vol] +=  weight_iqp_bdry * grad_sxx_dot_n_qp  * phi_sxx_bdry[i_bdry];
 
                            }
 
@@ -465,7 +465,7 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
 
 
 //========= BOUNDARY_IMPLEMENTATION_Sxx - END ==================
-
+*/
 
 
 
@@ -1056,7 +1056,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   KK->zero(); // Set to zero all the entries of the Global Matrix
 
 
-double alpha = 0.1 ;
+double alpha = 0.0001 ;
 double nu =  0.3 /* Poisson ratio value */;
 
 
@@ -1243,24 +1243,43 @@ double nu =  0.3 /* Poisson ratio value */;
         adept::adouble Laplace_q = 0.;
 
 
+// // //         adept::adouble M_u = phi[i] * soluGauss ;
+// // //
+// // //         adept::adouble M_sxx = nu * phi[i] * solsxxGauss + (1. - nu) * phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
+// // //
+// // //         adept::adouble M_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
+// // //
+// // //         adept::adouble M_syy = nu * phi[i] * solsyyGauss + (1. - nu) * phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
+// // //
+// // //         adept::adouble M_ud = phi[i] * soludGauss;
+// // //
+// // //         adept::adouble M_sxxd =  nu * phi[i] * solsxxdGauss + (1. - nu) * phi[i] * solsxxdGauss + nu * phi[i] * solsxxdGauss;
+// // //
+// // //         adept::adouble M_sxyd = 2. * (1. - nu) * phi[i] * solsxydGauss;
+// // //
+// // //         adept::adouble M_syyd = nu * phi[i] * solsyydGauss + (1. - nu) * phi[i] * solsyydGauss + nu * phi[i] * solsyydGauss;
+// // //
+// // //         adept::adouble M_q = phi[i] * solqGauss;
+
+
+
         adept::adouble M_u = phi[i] * soluGauss ;
 
-        adept::adouble M_sxx = nu * phi[i] * solsxxGauss + (1. - nu) * phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
+        adept::adouble M_sxx = phi[i] * solsxxGauss;
 
-        adept::adouble M_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
+        adept::adouble M_sxy = 2. * phi[i] * solsxyGauss;
 
-        adept::adouble M_syy = nu * phi[i] * solsyyGauss + (1. - nu) * phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
+        adept::adouble M_syy = phi[i] * solsyyGauss;
 
         adept::adouble M_ud = phi[i] * soludGauss;
 
-        adept::adouble M_sxxd =  nu * phi[i] * solsxxdGauss + (1. - nu) * phi[i] * solsxxdGauss + nu * phi[i] * solsxxdGauss;
+        adept::adouble M_sxxd = phi[i] * solsxxdGauss;
 
-        adept::adouble M_sxyd = 2. * (1. - nu) * phi[i] * solsxydGauss;
+        adept::adouble M_sxyd = 2. * phi[i] * solsxydGauss;
 
-        adept::adouble M_syyd = nu * phi[i] * solsyydGauss + (1. - nu) * phi[i] * solsyydGauss + nu * phi[i] * solsyydGauss;
+        adept::adouble M_syyd = phi[i] * solsyydGauss;
 
         adept::adouble M_q = phi[i] * solqGauss;
-
 
 
 
@@ -1299,32 +1318,60 @@ double nu =  0.3 /* Poisson ratio value */;
 
        if (dim == 2) {
 
-        Bxxu += nu * ( phi_x[i * dim] * soluGauss_x[0] +  phi_x[i * dim + 1] * soluGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soluGauss_x[0];
+// // //         Bxxu += nu * ( phi_x[i * dim] * soluGauss_x[0] +  phi_x[i * dim + 1] * soluGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soluGauss_x[0];
+// // //
+// // //         Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
+// // //
+// // //         Byyu +=  nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
+// // //
+// // //
+// // //         Bxx += nu * ( phi_x[i * dim] * solsxxGauss_x[0] +  phi_x[i * dim + 1] * solsxxGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxGauss_x[0];
+// // //
+// // //         Bxy += ( 1. - nu ) * ( phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1 ] * solsxyGauss_x[0] );
+// // //
+// // //         Byy +=  nu * ( phi_x[i * dim ] * solsyyGauss_x[0] + phi_x[i * dim +1] * solsyyGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyyGauss_x[1];
+// // //
+// // //
+// // //
+// // //         Bxxud +=  nu * ( phi_x[i * dim] * soludGauss_x[0] +  phi_x[i * dim + 1] * soludGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soludGauss_x[0];
+// // //
+// // //         Bxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
+// // //
+// // //         Byyud +=  nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
+// // //
+// // //         Bxxd += nu * ( phi_x[i * dim] * solsxxdGauss_x[0] +  phi_x[i * dim + 1] * solsxxdGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxdGauss_x[0];
+// // //
+// // //         Bxyd +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1 ] * solsxydGauss_x[0] );
+// // //
+// // //         Byyd +=   nu * ( phi_x[i * dim ] * solsyydGauss_x[0] + phi_x[i * dim +1] * solsyydGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyydGauss_x[1];
 
-        Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
 
-        Byyu +=  nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
+        Bxxu +=  phi_x[i * dim] * soluGauss_x[0];
 
+        Bxyu += phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0];
 
-        Bxx += nu * ( phi_x[i * dim] * solsxxGauss_x[0] +  phi_x[i * dim + 1] * solsxxGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxGauss_x[0];
-
-        Bxy += ( 1. - nu ) * ( phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1 ] * solsxyGauss_x[0] );
-
-        Byy +=  nu * ( phi_x[i * dim ] * solsyyGauss_x[0] + phi_x[i * dim +1] * solsyyGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyyGauss_x[1];
+        Byyu += phi_x[i * dim + 1] * soluGauss_x[1];
 
 
+        Bxx += phi_x[i * dim] * solsxxGauss_x[0];
 
-        Bxxud +=  nu * ( phi_x[i * dim] * soludGauss_x[0] +  phi_x[i * dim + 1] * soludGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soludGauss_x[0];
+        Bxy += phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1 ] * solsxyGauss_x[0];
 
-        Bxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
+        Byy +=  phi_x[i * dim +1] * solsyyGauss_x[1] ;
 
-        Byyud +=  nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
 
-        Bxxd += nu * ( phi_x[i * dim] * solsxxdGauss_x[0] +  phi_x[i * dim + 1] * solsxxdGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxdGauss_x[0];
 
-        Bxyd +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1 ] * solsxydGauss_x[0] );
+        Bxxud +=  phi_x[i * dim] * soludGauss_x[0] ;
 
-        Byyd +=   nu * ( phi_x[i * dim ] * solsyydGauss_x[0] + phi_x[i * dim +1] * solsyydGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyydGauss_x[1];
+        Bxyud +=  phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] ;
+
+        Byyud +=  phi_x[i * dim + 1] * soludGauss_x[1];
+
+        Bxxd +=  phi_x[i * dim] * solsxxdGauss_x[0];
+
+        Bxyd += ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1 ] * solsxydGauss_x[0] );
+
+        Byyd +=  phi_x[i * dim +1] * solsyydGauss_x[1];
 
 
 
@@ -1343,7 +1390,7 @@ double nu =  0.3 /* Poisson ratio value */;
      aRessxx[i] += (Bxxu + M_sxx ) * weight;
      aRessxy[i] += (Bxyu + M_sxy ) * weight;
      aRessyy[i] += (Byyu + M_syy ) * weight;
-     aResud[i] += ( M_u + Bxxd + Bxyd + Byyd + udr_term ) * weight;
+     aResud[i] += ( M_u + Bxxd + Bxyd + Byyd - udr_term ) * weight;
      aRessxxd[i] += (Bxxud + M_sxxd) * weight;
      aRessxyd[i] += (Bxyud + M_sxyd) * weight;
      aRessyyd[i] += (Byyud + M_syyd ) * weight;
