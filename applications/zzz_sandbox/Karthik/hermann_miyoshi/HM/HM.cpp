@@ -16,7 +16,7 @@
 #include "Files.hpp"
 #include "MultiLevelProblem.hpp"
 #include "MultiLevelSolution.hpp"
-#include "NonLinearImplicitSystem.hpp"
+// #include "NonLinearImplicitSystem.hpp"
 #include "LinearEquationSolver.hpp"
 #include "VTKWriter.hpp"
 #include "NumericVector.hpp"
@@ -574,13 +574,14 @@ int main(int argc, char** args) {
 
   // ======= Convergence study, FE setup - BEGIN =========================
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
+  // std::vector<FEOrder> feOrder = { SECOND };
 
     // // // std::vector<FEOrder> feOrder = { FIRST };
   // ======= Convergence study, FE setup - END =========================
 
 
   // ======= Convergence study, mesh loop and FE loop - BEGIN =========================
-  for (unsigned i = 0 /*maxNumberOfMeshes - 1*/; i < maxNumberOfMeshes; i++) {
+  for (unsigned i = 0; i < maxNumberOfMeshes; i++) {
     mlMsh.RefineMesh(i + 1, i + 1, nullptr);
     mlMsh.EraseCoarseLevels(i);
     mlMsh.PrintInfo();
@@ -621,7 +622,8 @@ int main(int argc, char** args) {
       mlSol.GenerateBdc("sxy", "Steady", &ml_prob);
       mlSol.GenerateBdc("syy", "Steady", &ml_prob);
 
-      NonLinearImplicitSystem& system = ml_prob.add_system<NonLinearImplicitSystem>(system_biharmonic_HM_D._system_name);
+      // NonLinearImplicitSystem& system = ml_prob.add_system<NonLinearImplicitSystem>(system_biharmonic_HM_D._system_name);
+      LinearImplicitSystem& system = ml_prob.add_system<LinearImplicitSystem>(system_biharmonic_HM_D._system_name);
       system.AddSolutionToSystemPDE("u");
       system.AddSolutionToSystemPDE("sxx");
       system.AddSolutionToSystemPDE("sxy");
@@ -630,6 +632,8 @@ int main(int argc, char** args) {
 
                   system.SetOuterSolver(PREONLY);
       system.init();
+      // system.SetPreconditionerCoarseGrid(MLU_PRECOND);
+      system.SetOuterSolver(PREONLY);
       system.MGsolve();
 
       std::pair<double, double> norm;

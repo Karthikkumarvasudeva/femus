@@ -290,67 +290,166 @@ namespace femus {
   }
 
   // ================================================
+void LinearEquationSolverPetsc::MGSolve(const bool ksp_clean) {
 
-  void LinearEquationSolverPetsc::MGSolve (const bool ksp_clean) {
+    PetscLogDouble t1, t2;
+    PetscTime(&t1);
 
-    PetscLogDouble t1;
-    PetscLogDouble t2;
-    PetscTime (&t1);
+    // --- Retrieve and assemble matrix ---
+    Mat KK = (static_cast<PetscMatrix*>(_KK))->mat();
+    MatAssemblyBegin(KK, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(KK, MAT_FINAL_ASSEMBLY);
+
+    // --- Apply boundary conditions consistently ---
+    ZerosBoundaryResiduals();
+    MatAssemblyBegin(KK, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(KK, MAT_FINAL_ASSEMBLY);
 
     if (ksp_clean) {
-      Mat KK = (static_cast< PetscMatrix* > (_KK))->mat();
+        KSPSetOperators(_ksp, KK, KK);
 
-      KSPSetOperators (_ksp, KK, KK);
+        if (_mgSolverType == PREONLY) {
+          KSPSetType(_ksp, KSPPREONLY);
+          PC pc;
+          KSPGetPC(_ksp, &pc);
+          PCSetType(pc, PCLU);
+          // Optional: choose backend
+          // PCFactorSetMatSolverType(pc, MATSOLVERMUMPS);
+        }
 
-      KSPSetTolerances (_ksp, _rtol, _abstol, _dtol, _maxits);
-
-      if (_mgSolverType != PREONLY) {
-        KSPSetInitialGuessKnoll (_ksp, PETSC_TRUE);
-      }
-      else {
-        KSPSetInitialGuessKnoll (_ksp, PETSC_FALSE);
-        KSPSetNormType (_ksp, KSP_NORM_NONE);
-      }
-
-      KSPSetFromOptions (_ksp);
-      KSPGMRESSetRestart (_ksp, _restart);
-      KSPSetUp (_ksp);
-
-//       PetscViewer    viewer;
-//       PetscViewerDrawOpen(PETSC_COMM_WORLD,NULL,NULL,0,0,1800,1800,&viewer);
-//       PetscObjectSetName((PetscObject)viewer,"FSI matrix");
-//       PetscViewerPushFormat(viewer,PETSC_VIEWER_DRAW_LG);
-//       MatView(KK,viewer);
-//
-//       VecView((static_cast< PetscVector* >(_RES))->vec(),viewer);
-//       double a;
-//       std::cin>>a;
+        KSPSetTolerances(_ksp, _rtol, _abstol, _dtol, _maxits);
+        KSPSetFromOptions(_ksp);
+        if (_mgSolverType != PREONLY) {
+          KSPSetInitialGuessKnoll (_ksp, PETSC_TRUE);
+          KSPGMRESSetRestart (_ksp, _restart);
+        }
+        KSPSetUp(_ksp);
     }
 
-    ZerosBoundaryResiduals();
-    KSPSolve (_ksp, (static_cast< PetscVector* > (_RES))->vec(), (static_cast< PetscVector* > (_EPSC))->vec());
+    // // --- Apply boundary conditions consistently ---
+    // ZerosBoundaryResiduals();
 
-    _RESC->matrix_mult (*_EPSC, *_KK);
+    // // --- Finalize assembly before dump and solve ---
+    // MatAssemblyBegin(KK, MAT_FINAL_ASSEMBLY);
+    // MatAssemblyEnd(KK, MAT_FINAL_ASSEMBLY);
+
+    // --- Dump matrix and RHS for verification ---
+    // {
+    //     PetscViewer viewer;
+    //     PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_dump.m", &viewer);
+    //     PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB);
+    //     MatView(KK, viewer);
+    //     PetscViewerPopFormat(viewer);
+    //     PetscViewerDestroy(&viewer);
+    // }
+    //
+    // {
+    //     PetscViewer viewer_vec;
+    //     PetscViewerASCIIOpen(PETSC_COMM_WORLD, "rhs_dump.m", &viewer_vec);
+    //     PetscViewerPushFormat(viewer_vec, PETSC_VIEWER_ASCII_MATLAB);
+    //     VecView((static_cast<PetscVector*>(_RES))->vec(), viewer_vec);
+    //     PetscViewerPopFormat(viewer_vec);
+    //     PetscViewerDestroy(&viewer_vec);
+    // }
+
+//     PC pc;
+// KSPGetPC(_ksp, &pc);
+// PetscViewer viewer;
+// PetscViewerASCIIGetStdout(PETSC_COMM_WORLD, &viewer);
+// PCView(pc, viewer);
+
+    // --- Solve system (direct LU, PREONLY) ---
+    KSPSolve(_ksp,
+             (static_cast<PetscVector*>(_RES))->vec(),
+             (static_cast<PetscVector*>(_EPSC))->vec());
+
+    // --- Postprocess results ---
+    _RESC->matrix_mult(*_EPSC, *_KK);
     *_RES -= *_RESC;
     *_EPS += *_EPSC;
 
     if (_printSolverInfo) {
-      int its;
-      KSPGetIterationNumber (_ksp, &its);
+        int its;
+        KSPGetIterationNumber(_ksp, &its);
 
-      KSPConvergedReason reason;
-      KSPGetConvergedReason (_ksp, &reason);
+        KSPConvergedReason reason;
+        KSPGetConvergedReason(_ksp, &reason);
 
-      PetscReal rnorm;
-      KSPGetResidualNorm (_ksp, &rnorm);
+        PetscReal rnorm;
+        KSPGetResidualNorm(_ksp, &rnorm);
 
-      PetscTime (&t2);
-      PetscPrintf (PETSC_COMM_WORLD, "       *************** MG linear solver time: %e \n", t2 - t1);
-      PetscPrintf (PETSC_COMM_WORLD, "       *************** Number of outer ksp solver iterations = %i \n", its);
-      PetscPrintf (PETSC_COMM_WORLD, "       *************** Convergence reason = %i \n", reason);
-      PetscPrintf (PETSC_COMM_WORLD, "       *************** Residual norm = %10.8g \n", rnorm);
+        PetscTime(&t2);
+        PetscPrintf(PETSC_COMM_WORLD,
+                    "       *************** MG linear solver time: %e\n", t2 - t1);
+        PetscPrintf(PETSC_COMM_WORLD,
+                    "       *************** Number of outer KSP iterations = %i\n", its);
+        PetscPrintf(PETSC_COMM_WORLD,
+                    "       *************** Convergence reason = %i\n", reason);
+        PetscPrintf(PETSC_COMM_WORLD,
+                    "       *************** Residual norm = %10.8g\n", rnorm);
     }
-  }
+}
+
+//   void LinearEquationSolverPetsc::MGSolve (const bool ksp_clean) {
+//
+//     PetscLogDouble t1;
+//     PetscLogDouble t2;
+//     PetscTime (&t1);
+//
+//     if (ksp_clean) {
+//       Mat KK = (static_cast< PetscMatrix* > (_KK))->mat();
+//
+//       KSPSetOperators (_ksp, KK, KK);
+//
+//       KSPSetTolerances (_ksp, _rtol, _abstol, _dtol, _maxits);
+//
+//       if (_mgSolverType != PREONLY) {
+//         KSPSetInitialGuessKnoll (_ksp, PETSC_TRUE);
+//       }
+//       else {
+//         KSPSetInitialGuessKnoll (_ksp, PETSC_FALSE);
+//         KSPSetNormType (_ksp, KSP_NORM_NONE);
+//       }
+//
+//       KSPSetFromOptions (_ksp);
+//       KSPGMRESSetRestart (_ksp, _restart);
+//       KSPSetUp (_ksp);
+//
+// //       PetscViewer    viewer;
+// //       PetscViewerDrawOpen(PETSC_COMM_WORLD,NULL,NULL,0,0,1800,1800,&viewer);
+// //       PetscObjectSetName((PetscObject)viewer,"FSI matrix");
+// //       PetscViewerPushFormat(viewer,PETSC_VIEWER_DRAW_LG);
+// //       MatView(KK,viewer);
+// //
+// //       VecView((static_cast< PetscVector* >(_RES))->vec(),viewer);
+// //       double a;
+// //       std::cin>>a;
+//     }
+//
+//     ZerosBoundaryResiduals();
+//     KSPSolve (_ksp, (static_cast< PetscVector* > (_RES))->vec(), (static_cast< PetscVector* > (_EPSC))->vec());
+//
+//     _RESC->matrix_mult (*_EPSC, *_KK);
+//     *_RES -= *_RESC;
+//     *_EPS += *_EPSC;
+//
+//     if (_printSolverInfo) {
+//       int its;
+//       KSPGetIterationNumber (_ksp, &its);
+//
+//       KSPConvergedReason reason;
+//       KSPGetConvergedReason (_ksp, &reason);
+//
+//       PetscReal rnorm;
+//       KSPGetResidualNorm (_ksp, &rnorm);
+//
+//       PetscTime (&t2);
+//       PetscPrintf (PETSC_COMM_WORLD, "       *************** MG linear solver time: %e \n", t2 - t1);
+//       PetscPrintf (PETSC_COMM_WORLD, "       *************** Number of outer ksp solver iterations = %i \n", its);
+//       PetscPrintf (PETSC_COMM_WORLD, "       *************** Convergence reason = %i \n", reason);
+//       PetscPrintf (PETSC_COMM_WORLD, "       *************** Residual norm = %10.8g \n", rnorm);
+//     }
+//   }
 
   // ================================================
 

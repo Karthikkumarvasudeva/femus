@@ -313,13 +313,13 @@ public:
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = -16. * pi * pi * pi * sin(4. *pi * x[0]);
-        solGrad[1] = 16. * pi * pi * pi * sin(4. *pi * x[1]);
+        solGrad[0] = -8. * pi * pi * pi * sin(4. *pi * x[0]);
+        solGrad[1] = 8. * pi * pi * pi * sin(4. *pi * x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return -64. * pi * pi * pi * pi * ( cos(4. *pi * x[0]) + cos(4. *pi * x[1]) ) ;
+        return -32. * pi * pi * pi * pi * ( cos(4. *pi * x[0]) + cos(4. *pi * x[1]) ) ;
     }
 
 private:
@@ -480,9 +480,13 @@ int main(int argc, char** args) {
 
   MultiLevelMesh mlMsh;
   const std::string mesh_file_total = system_biharmonic_HM_D._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM_D._mesh_files[0];
+
+  // mlMsh.GenerateCoarseBoxMesh(2, 2, 0, -0.5, 0.5, -0.5, 0.5, 0., 0., QUAD9, "seventh");
+
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", 1.0);
 
-  const unsigned maxNumberOfMeshes = 6;
+  const unsigned maxNumberOfMeshes = 4;
+
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
 
   std::vector<std::vector<double>> l2Norm_u(maxNumberOfMeshes), semiNorm_u(maxNumberOfMeshes);
