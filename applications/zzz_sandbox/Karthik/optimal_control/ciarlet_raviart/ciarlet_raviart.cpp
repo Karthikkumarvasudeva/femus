@@ -124,21 +124,21 @@ class Function_Zero_on_boundary_7_u_d : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
-        return alpha * 64. * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]);
+        return - alpha * 64. * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-       solGrad[0] = alpha * 128.0 * pi * pi * pi * pi * pi *
+       solGrad[0] = - alpha * 128.0 * pi * pi * pi * pi * pi *
                      cos(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
-        solGrad[1] = alpha * 128.0 * pi * pi * pi * pi * pi *
+        solGrad[1] = - alpha * 128.0 * pi * pi * pi * pi * pi *
                      sin(2.0 * pi * x[0]) * cos(2.0 * pi * x[1]);
 
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return -alpha * 512.0 * pi * pi * pi * pi * pi * pi *
+        return alpha * 512.0 * pi * pi * pi * pi * pi * pi *
                sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
     }
 
@@ -153,20 +153,20 @@ class Function_Zero_on_boundary_7_sigma_d : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
-        return alpha * 512. * pi * pi * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]) ;
+        return - alpha * 512. * pi * pi * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]) ;
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = alpha * 1024.0 * pow(pi,7) *
+        solGrad[0] = - alpha * 1024.0 * pow(pi,7) *
                      cos(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
-        solGrad[1] = alpha * 1024.0 * pow(pi,7) *
+        solGrad[1] = - alpha * 1024.0 * pow(pi,7) *
                      sin(2.0 * pi * x[0]) * cos(2.0 * pi * x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return -alpha * 4096.0 * pow(pi,8) *
+        return alpha * 4096.0 * pow(pi,8) *
                sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
     }
 
@@ -181,20 +181,20 @@ class Function_Zero_on_boundary_7_q : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
-        return - 64. * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]) ;
+        return  64. * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]) ;
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = -128.0 * pow(pi,5) *
+        solGrad[0] = 128.0 * pow(pi,5) *
                      cos(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
-        solGrad[1] = -128.0 * pow(pi,5) *
+        solGrad[1] = 128.0 * pow(pi,5) *
                      sin(2.0 * pi * x[0]) * cos(2.0 * pi * x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return 512.0 * pow(pi,6) *
+        return - 512.0 * pow(pi,6) *
                sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
     }
 
@@ -344,7 +344,7 @@ system_biharmonic_HM._assemble_function_for_rhs = &system_biharmonic_HM_function
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 2;
+  unsigned maxNumberOfMeshes = 9;
 
   // // // std::vector < std::vector < double > > l2Norm;
   // // // l2Norm.resize(maxNumberOfMeshes);
