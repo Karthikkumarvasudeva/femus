@@ -630,7 +630,7 @@ int main(int argc, char** args) {
       system.AddSolutionToSystemPDE("syy");
       system.SetAssembleFunction(system_biharmonic_HM_D._assemble_function);
 
-                  system.SetOuterSolver(PREONLY);
+                  // system.SetOuterSolver(PREONLY);
       system.init();
       // system.SetPreconditionerCoarseGrid(MLU_PRECOND);
       system.SetOuterSolver(PREONLY);

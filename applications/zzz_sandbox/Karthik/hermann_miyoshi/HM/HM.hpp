@@ -1192,7 +1192,7 @@ double nu2 = 2.0 / (1.0 + nu);
         adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian(xGauss) * phi[i];
 
         // System residuals - signs adjusted to match matrix form
-     aResu[i] += ( 0.01 /** phi[i]*/ * solu[i] +Bxxsxx + Bxysxy + Byysyy + F_term ) * weight;
+     aResu[i] += ( Bxxsxx + Bxysxy + Byysyy + F_term ) * weight;
      aRessxx[i] += (Bxxu + Mxxxx_sxx ) * weight;
      aRessxy[i] += ( Bxyu + Mxyxy_sxy ) * weight;
      aRessyy[i] += (Byyu + Myyyy_syy) * weight;
