@@ -563,7 +563,7 @@ int main(int argc, char** args) {
 
 
   // ======= Convergence study, mesh setup - BEGIN =========================
-  const unsigned maxNumberOfMeshes = 5;
+  const unsigned maxNumberOfMeshes = 6;
 
   std::vector<std::vector<double>> l2Norm_u(maxNumberOfMeshes), semiNorm_u(maxNumberOfMeshes);
   std::vector<std::vector<double>> l2Norm_sxx(maxNumberOfMeshes), semiNorm_sxx(maxNumberOfMeshes);

@@ -16,7 +16,7 @@
 #include "Files.hpp"
 #include "MultiLevelProblem.hpp"
 #include "MultiLevelSolution.hpp"
-#include "NonLinearImplicitSystem.hpp"
+// #include "NonLinearImplicitSystem.hpp"
 #include "LinearEquationSolver.hpp"
 #include "VTKWriter.hpp"
 #include "NumericVector.hpp"
@@ -494,7 +494,7 @@ int main(int argc, char** args) {
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 4;
+  unsigned maxNumberOfMeshes = 6;
 
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
 
@@ -599,6 +599,8 @@ int main(int argc, char** args) {
       system.SetAssembleFunction(system_biharmonic_HM._assemble_function);
 
       system.init();
+            system.SetOuterSolver(PREONLY);
+
       system.MGsolve();
 
 auto put_err = [&](const char* name, Math::Function<double>* exact,

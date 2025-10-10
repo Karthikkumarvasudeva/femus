@@ -464,7 +464,7 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
 }
 
 
-//========= BOUNDARY_IMPLEMENTATION_V - END ==================
+//========= BOUNDARY_IMPLEMENTATION_Sxx - END ==================
 
 
 
