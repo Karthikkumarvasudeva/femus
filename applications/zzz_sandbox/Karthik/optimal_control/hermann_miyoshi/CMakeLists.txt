@@ -9,7 +9,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
 
   ADD_SUBDIRECTORY(./HM_with_decomposition_oc/)
 
-  ADD_SUBDIRECTORY(./HM_nonconforming_oc/)
+  ADD_SUBDIRECTORY(./HM_oc/)
 
 
 

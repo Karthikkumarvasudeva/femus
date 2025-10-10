@@ -1044,7 +1044,7 @@ double nu2 = 2.0 / (1.0 + nu);
     short unsigned ielGeom = msh->GetElementType(iel);
 
 // // //     unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
-    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
+    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_s1);    // number of solution element dofs
 
     unsigned nDofs2 = msh->GetElementDofNumber(iel, xType);    // number of coordinate element dofs
 
@@ -1071,7 +1071,7 @@ double nu2 = 2.0 / (1.0 + nu);
     for (unsigned i = 0; i < nDofs; i++) {
 
 // // //       unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_u);    // global to global mapping between solution node and solution dof
-      unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_u);    // global to global mapping between solution node and solution dof
+      unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_s1);    // global to global mapping between solution node and solution dof
 
 
 
@@ -1104,7 +1104,7 @@ double nu2 = 2.0 / (1.0 + nu);
     for (unsigned ig = 0; ig < msh->_finiteElement[ielGeom][solFEType_u]->GetGaussPointNumber(); ig++) {
 // *** get gauss point weight, test function and test function partial derivatives ***
 
-      msh->_finiteElement[ielGeom][solFEType_u]->Jacobian(x, ig, weight, phi, phi_x, phi_xx);
+      msh->_finiteElement[ielGeom][solFEType_s1]->Jacobian(x, ig, weight, phi, phi_x, phi_xx);
 
       std::vector < double > xGauss(dim, 0.);
 
@@ -1177,8 +1177,8 @@ double nu2 = 2.0 / (1.0 + nu);
 
 // // //     if (dim == 2) {
 
-        Bc1u += 0.5 * ( phi_x[i * dim] * soluGauss_x[0] - phi_x[i * dim + 1] * soluGauss_x[1] ) ;
-        Bc2u +=  0.5 * ( phi_x[i * dim + 1] * soluGauss_x[0] + phi_x[i * dim ] * soluGauss_x[1] ) ;
+        Bc1u += 0.5 * ( phi_x[i * dim + 1] * soluGauss_x[1] - phi_x[i * dim + 0] * soluGauss_x[0] ) ;
+        Bc2u +=  0.5 * ( phi_x[i * dim + 0] * soluGauss_x[1] + phi_x[i * dim + 1] * soluGauss_x[0] ) ;
 // //         Bu +=  phi_x[i * dim + 1] * soluGauss_x[1];
 
         Bc1s1 += nu1 * 0.5 * ( phi_x[i * dim] * sols1Gauss_x[0] - phi_x[i * dim + 1] * sols1Gauss_x[1] );
@@ -1236,7 +1236,7 @@ double nu2 = 2.0 / (1.0 + nu);
 
     KK->add_matrix_blocked(Jac, sysDof, sysDof);
 
-         constexpr bool print_algebra_local = true;
+         constexpr bool print_algebra_local = false;
      if (print_algebra_local) {
 
          assemble_jacobian<double,double>::print_element_jacobian(iel, Jac, Sol_n_el_dofs_Mat_vol, 10, 5);
