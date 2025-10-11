@@ -665,7 +665,7 @@ int main(int argc, char** args) {
 
       mlSol.GenerateBdc("q", "Steady", &ml_prob);
 
-      NonLinearImplicitSystem& system = ml_prob.add_system<NonLinearImplicitSystem>(system_biharmonic_HM._system_name);
+      LinearImplicitSystem& system = ml_prob.add_system<LinearImplicitSystem>(system_biharmonic_HM._system_name);
       system.AddSolutionToSystemPDE("u");
       system.AddSolutionToSystemPDE("sxx");
       system.AddSolutionToSystemPDE("sxy");
@@ -685,6 +685,7 @@ int main(int argc, char** args) {
       system.SetAssembleFunction(system_biharmonic_HM._assemble_function);
 
       system.init();
+      system.SetOuterSolver(PREONLY);
       system.MGsolve();
 
 auto put_err = [&](const char* name, Math::Function<double>* exact,
