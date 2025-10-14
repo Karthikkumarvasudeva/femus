@@ -261,7 +261,7 @@ static void natural_loop_2d3dU(const MultiLevelProblem *    ml_prob,
 
 //========= BOUNDARY_IMPLEMENTATION_U - END ==================
 
-
+/*
 //========= BOUNDARY_IMPLEMENTATION_V - BEGIN ==================
 
 static void natural_loop_1dV(const MultiLevelProblem *    ml_prob,
@@ -307,7 +307,7 @@ static void natural_loop_1dV(const MultiLevelProblem *    ml_prob,
 
                  unsigned int i_vol = msh->GetLocalFaceVertexIndex(iel, jface, i);
 
-                 Res[i_vol] +=  grad_v_dot_n /* * phi[node] = 1. */;
+                 Res[i_vol] +=  grad_v_dot_n ;
 
                          }
 
@@ -331,7 +331,7 @@ static void natural_loop_2d3dV(const MultiLevelProblem *    ml_prob,
                        const unsigned solFEType_v,
                        std::vector< double > & Res,
                        //-----------
-                       std::vector < std::vector < /*const*/ elem_type_templ_base<real_num, real_num_mov> *  > >  elem_all,
+                       std::vector < std::vector <  elem_type_templ_base<real_num, real_num_mov> *  > >  elem_all,
                        const unsigned dim,
                        const unsigned space_dim,
                        const unsigned max_size
@@ -393,7 +393,7 @@ static void natural_loop_2d3dV(const MultiLevelProblem *    ml_prob,
          //while here we pass the FACE ELEMENT CENTER coordinates.
          // So, if we use this for enforcing space-dependent Dirichlet or Neumann values, we need to be careful!
 
-             if ( !(is_dirichlet) /* &&  (grad_u_dot_n != 0.)*/ ) {  //dirichlet == false and nonhomogeneous Neumann
+             if ( !(is_dirichlet)  ) {  //dirichlet == false and nonhomogeneous Neumann
 
     unsigned n_dofs_face_v = msh->GetElementFaceDofNumber(iel, jface, solFEType_v);
 
@@ -458,7 +458,7 @@ static void natural_loop_2d3dV(const MultiLevelProblem *    ml_prob,
 
                  unsigned int i_vol = msh->GetLocalFaceVertexIndex(iel, jface, i_bdry);
 
-                 Res[i_vol] +=  weight_iqp_bdry * grad_v_dot_n_qp /*grad_u_dot_n*/  * phi_v_bdry[i_bdry];
+                 Res[i_vol] +=  weight_iqp_bdry * grad_v_dot_n_qp   * phi_v_bdry[i_bdry];
 
                            }
 
@@ -475,7 +475,7 @@ static void natural_loop_2d3dV(const MultiLevelProblem *    ml_prob,
 
 
 //========= BOUNDARY_IMPLEMENTATION_V - END ==================
-
+*/
 
 
 static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
