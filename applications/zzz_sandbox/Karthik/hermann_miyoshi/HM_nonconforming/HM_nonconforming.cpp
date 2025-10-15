@@ -290,6 +290,7 @@ int main(int argc, char** args) {
       system.SetAssembleFunction(system_biharmonic_HM_D._assemble_function);
 
       system.init();
+      system.SetOuterSolver(PREONLY);
       system.MGsolve();
 
       std::pair<double, double> norm;

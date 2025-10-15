@@ -8,7 +8,7 @@
 #include "Files.hpp"
 #include "MultiLevelProblem.hpp"
 #include "MultiLevelSolution.hpp"
-#include "NonLinearImplicitSystem.hpp"
+// #include "NonLinearImplicitSystem.hpp"
 #include "LinearEquationSolver.hpp"
 #include "VTKWriter.hpp"
 #include "NumericVector.hpp"
@@ -41,7 +41,7 @@ namespace  square_m05p05  {
 
       static constexpr double nu = 0.;
 
-
+/*
 
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
@@ -166,9 +166,9 @@ private:
     static constexpr double pi = acos(-1.);
 };
 
+*/
 
 
-/*
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
 
@@ -254,28 +254,38 @@ public:
         double cos2X = cos(2.0 * pi * X);
         double sin2Y = sin(2.0 * pi * Y);
         double cos2Y = cos(2.0 * pi * Y);
+        double sin4X = sin(4.0 * pi * X);
+        double sin4Y = sin(4.0 * pi * Y);
+        double cos4X = cos(4.0 * pi * X);
+        double cos4Y = cos(4.0 * pi * Y);
 
-        // Partial derivatives
+        // ∂f/∂X = 8π²[ -4π sin²(2πY) sin(4πX) + ν·2π sin(4πX) cos(4πY) ]
         solGrad[0] = 8.0 * pi * pi * (
-            -4.0 * pi * sin(4.0 * pi * X) * sin2Y * sin2Y
-            + nu * 4.0 * pi * sin(4.0 * pi * X) * cos(4.0 * pi * Y) / tan(4.0 * pi * X) // simplified form below
+            -4.0 * pi * sin2Y * sin2Y * sin4X +
+            nu * 2.0 * pi * sin4X * cos4Y
         );
 
-        // simplified and correct version:
-        solGrad[0] = -32.0 * pi * pi * pi * sin(4.0 * pi * X) * (sin2Y * sin2Y);
-
-        solGrad[1] = 16.0 * pi * pi * pi * cos(4.0 * pi * X) * sin(4.0 * pi * Y);
+        // ∂f/∂Y = 8π²[ 2π sin(4πY) cos(4πX) - ν·4π sin²(2πX) sin(4πY) ]
+        solGrad[1] = 8.0 * pi * pi * (
+            2.0 * pi * sin4Y * cos4X -
+            nu * 4.0 * pi * sin2X * sin2X * sin4Y
+        );
 
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
         double X = x[0], Y = x[1];
-        double s2Y = sin(2.0 * pi * Y);
-        double c4X = cos(4.0 * pi * X);
-        double c4Y = cos(4.0 * pi * Y);
-        // using form: 64*pi^4 * c4X * (c4Y - 2*s2Y^2)
-        return 64.0 * pi * pi * pi * pi * c4X * (c4Y - 2.0 * (s2Y * s2Y));
+        double sin2X = sin(2.0 * pi * X);
+        double sin2Y = sin(2.0 * pi * Y);
+        double cos4X = cos(4.0 * pi * X);
+        double cos4Y = cos(4.0 * pi * Y);
+
+        // ∇²f = 64π⁴[ (-2sin²(2πY) + ν cos(4πY)) cos(4πX) + (cos(4πX) - 2ν sin²(2πX)) cos(4πY) ]
+        double term1 = (-2.0 * sin2Y * sin2Y + nu * cos4Y) * cos4X;
+        double term2 = (cos4X - 2.0 * nu * sin2X * sin2X) * cos4Y;
+
+        return 64.0 * pi * pi * pi * pi * (term1 + term2);
     }
 
 private:
@@ -287,22 +297,28 @@ class Function_Zero_on_boundary_7_sxy : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
-        return 4.0 * pi * pi *
-               sin(4.0 * pi * x[0]) * sin(4.0 * pi * x[1]);
+        return (1. - nu) * 4. * pi * pi * sin(4. * pi * x[0]) * sin(4. * pi * x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = 16.0 * pow(pi,3) *
-                     cos(4.0 * pi * x[0]) * sin(4.0 * pi * x[1]);
-        solGrad[1] = 16.0 *  pow(pi,3) *
-                     sin(4.0 * pi * x[0]) * cos(4.0 * pi * x[1]);
+        double X = x[0], Y = x[1];
+        double s4X = sin(4.0 * pi * X);
+        double s4Y = sin(4.0 * pi * Y);
+        double c4X = cos(4.0 * pi * X);
+        double c4Y = cos(4.0 * pi * Y);
+        double factor = 16.0 * pi * pi * pi; // 16 * pi^3
+        solGrad[0] = (1. - nu) * factor * c4X * s4Y;
+        solGrad[1] = (1. - nu) * factor * s4X * c4Y;
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return -128.0 * pow(pi,4) *
-               sin(4.0 * pi * x[0]) * sin(4.0 * pi * x[1]);
+        double X = x[0], Y = x[1];
+        double s4X = sin(4.0 * pi * X);
+        double s4Y = sin(4.0 * pi * Y);
+        // -128 * pi^4 * sin(4pi x) * sin(4pi y)
+        return -(1. - nu) * 128.0 * pi * pi * pi * pi * (s4X * s4Y);
     }
 
 private:
@@ -315,33 +331,51 @@ class Function_Zero_on_boundary_7_syy : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
         double X = x[0], Y = x[1];
-        double sin2X = sin(2.0 * pi * X);
         double sin2Y = sin(2.0 * pi * Y);
-        return 8.0 * pi * pi * cos(4.0 * pi * Y) * (sin2X * sin2X);
+        double sin2X = sin(2.0 * pi * X);
+        return nu * 8.0 * pi * pi * cos(4.0 * pi * X) * (sin2Y * sin2Y) + 8.0 * pi * pi * cos(4.0 * pi * Y) * (sin2X * sin2X);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
         double X = x[0], Y = x[1];
-        double s2X = sin(2.0 * pi * X);
-        solGrad[0] = 16.0 * pi * pi * pi * cos(4.0 * pi * Y) * sin(4.0 * pi * X);
-        solGrad[1] = -32.0 * pi * pi * pi * sin(4.0 * pi * Y) * (s2X * s2X);
+
+        double sin2X = sin(2.0 * pi * X);
+        double sin2Y = sin(2.0 * pi * Y);
+        double sin4X = sin(4.0 * pi * X);
+        double sin4Y = sin(4.0 * pi * Y);
+        double cos4X = cos(4.0 * pi * X);
+        double cos4Y = cos(4.0 * pi * Y);
+
+        // ∂f/∂X = 16π³ sin(4πX)[cos(4πY) - 2ν sin²(2πY)]
+        solGrad[0] = 16.0 * pi * pi * pi * sin4X * (cos4Y - 2.0 * nu * sin2Y * sin2Y);
+
+        // ∂f/∂Y = 16π³ sin(4πY)[ν cos(4πX) - 2 sin²(2πX)]
+        solGrad[1] = 16.0 * pi * pi * pi * sin4Y * (nu * cos4X - 2.0 * sin2X * sin2X);
+
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
         double X = x[0], Y = x[1];
-        double s2X = sin(2.0 * pi * X);
-        double c4X = cos(4.0 * pi * X);
-        double c4Y = cos(4.0 * pi * Y);
-        // 64*pi^4 * c4Y * (c4X - 2*s2X^2)
-        return 64.0 * pi * pi * pi * pi * c4Y * (c4X - 2.0 * (s2X * s2X));
+
+        double sin2X = sin(2.0 * pi * X);
+        double sin2Y = sin(2.0 * pi * Y);
+        double cos4X = cos(4.0 * pi * X);
+        double cos4Y = cos(4.0 * pi * Y);
+
+        // ∇²f = 64π⁴[(1+ν)cos(4πX)cos(4πY) - 2ν sin²(2πY)cos(4πX) - 2 sin²(2πX)cos(4πY)]
+        double term1 = (1.0 + nu) * cos4X * cos4Y;
+        double term2 = -2.0 * nu * sin2Y * sin2Y * cos4X;
+        double term3 = -2.0 * sin2X * sin2X * cos4Y;
+
+        return 64.0 * pi * pi * pi * pi * (term1 + term2 + term3);
     }
 
 private:
     static constexpr double pi = acos(-1.);
 };
-*/
+
 
 }
 
@@ -351,26 +385,42 @@ private:
 
 
 //====Set boundary condition-BEGIN==============================
-bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
-  bool dirichlet = true; //dirichlet
+bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob,
+                                                       const std::vector < double >& x,
+                                                       const char SolName[],
+                                                       double & Value,
+                                                       const int facename,
+                                                       const double time) {
+
+  bool dirichlet = false; //dirichlet
 
   if (!strcmp(SolName, "u")) {
       Math::Function <double> * u = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
       // strcmp compares two string in lexiographic sense.
-    Value = u -> value(x);
+      Value = u -> value(x);
+          dirichlet = true;
+
   }
   else if (!strcmp(SolName, "sxx")) {
-      Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxx -> value(x);
+       Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+       Value = sxx -> value(x);
+              dirichlet = true;
   }
     else if (!strcmp(SolName, "sxy")) {
       Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     Value = sxy -> value(x);
+                dirichlet = true;
   }
     else if (!strcmp(SolName, "syy")) {
       Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     Value = syy -> value(x);
+                // // // Value = analytical_syy_solution.value(x);
+                dirichlet = true ;
   }
+
+  // // // double value = 0.;  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  // Value = 0.;
+
   return dirichlet;
 }
 //====Set boundary condition-END==============================
@@ -396,55 +446,55 @@ int main(int argc, char** args) {
     // ======= System Specifics - BEGIN  ==================
   system_specifics  system_biharmonic_HM;   //me
 
-  // =========Mesh file - BEGIN ==================
-  system_biharmonic_HM._mesh_files.push_back("square_-0p5-0p5x-0p5-0p5_divisions_2x2.med");
-  const std::string relative_path_to_build_directory =  "../../../../../";
-  const std::string mesh_file = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";  system_biharmonic_HM._mesh_files_path_relative_to_executable.push_back(mesh_file);
- // =========Mesh file - END ==================
-
 
   system_biharmonic_HM._system_name = "Biharmonic";
   system_biharmonic_HM._assemble_function = NAMESPACE_FOR_BIHARMONIC_HM :: biharmonic_HM_with_operator :: AssembleBilaplaceProblem_AD;
 
   system_biharmonic_HM._boundary_conditions_types_and_values             = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7   <>   system_biharmonic_HM_function_zero_on_boundary_1;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_sxx  <>   system_biharmonic_HM_function_zero_on_boundary_sxx;
+    // ======= RHS - BEGIN =========================
+  Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian<> system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_sxy  <>   system_biharmonic_HM_function_zero_on_boundary_sxy;
+  system_biharmonic_HM._assemble_function_for_rhs = & system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
+  // ======= RHS - END =========================
 
-    Domains::square_m05p05::Function_Zero_on_boundary_7_syy  <>   system_biharmonic_HM_function_zero_on_boundary_syy;
+    // ======= Analytical solutions - BEGIN =======================
+  Domains::square_m05p05::Function_Zero_on_boundary_7<> system_biharmonic_HM_function_zero_on_boundary_1;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_sxx<> system_biharmonic_HM_function_zero_on_boundary_sxx;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_sxy<> system_biharmonic_HM_function_zero_on_boundary_sxy;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_syy<> system_biharmonic_HM_function_zero_on_boundary_syy;
 
+  system_biharmonic_HM._true_solution_function = & system_biharmonic_HM_function_zero_on_boundary_1;  ///only for 1 unknown???
+  // ======= Analytical solutions - END =========================
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian /* Function_Zero_on_boundary_5_Laplacian*/ <>   system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
-
-  system_biharmonic_HM._assemble_function_for_rhs   = & system_biharmonic_HM_function_zero_on_boundary_1_Laplacian; //this is the RHS for the auxiliary variable v = -Delta u
-  system_biharmonic_HM._true_solution_function      = & system_biharmonic_HM_function_zero_on_boundary_1;
-
-
-
-
-  ///@todo if this is not set, nothing happens here. It is used to compute absolute errors
-    // ======= System Specifics - END ==================
+      // ======= System Specifics - END ==================
 
 
+  // =========Mesh file - BEGIN ==================
+   MultiLevelMesh mlMsh;
 
-  // define multilevel mesh
-  MultiLevelMesh mlMsh;
-  // read coarse level mesh and generate finers level meshes
-  double scalingFactor = 1.;
+  system_biharmonic_HM._mesh_files.push_back("square_-0p5-0p5x-0p5-0p5_divisions_2x2.med");
+  const std::string relative_path_to_build_directory =  "../../../../../";
+  const std::string mesh_file = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";  system_biharmonic_HM._mesh_files_path_relative_to_executable.push_back(mesh_file);
+
+    double scalingFactor = 1.;
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
+ // =========Mesh file - END ==================
 
-  unsigned maxNumberOfMeshes = 5;
 
-  std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
+
+  unsigned maxNumberOfMeshes = 7;
 
   std::vector<std::vector<double>> l2Norm_u(maxNumberOfMeshes), semiNorm_u(maxNumberOfMeshes);
   std::vector<std::vector<double>> l2Norm_sxx(maxNumberOfMeshes), semiNorm_sxx(maxNumberOfMeshes);
   std::vector<std::vector<double>> l2Norm_sxy(maxNumberOfMeshes), semiNorm_sxy(maxNumberOfMeshes);
   std::vector<std::vector<double>> l2Norm_syy(maxNumberOfMeshes), semiNorm_syy(maxNumberOfMeshes);
+
+
+  std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
+
 
   for (unsigned i = 0; i < maxNumberOfMeshes; i++) {
     mlMsh.RefineMesh(i + 1, i + 1, nullptr);

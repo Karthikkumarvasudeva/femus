@@ -258,7 +258,7 @@ static void natural_loop_2d3dU(const MultiLevelProblem *    ml_prob,
 
 //========= BOUNDARY_IMPLEMENTATION_Sxx - BEGIN ==================
 
-static void natural_loop_1dV(const MultiLevelProblem *    ml_prob,
+static void natural_loop_1dSxx(const MultiLevelProblem *    ml_prob,
                      const Mesh *                    msh,
                      const MultiLevelSolution *    ml_sol,
                      const unsigned iel,
@@ -315,7 +315,7 @@ static void natural_loop_1dV(const MultiLevelProblem *    ml_prob,
 
 
 template < class real_num, class real_num_mov >
-static void natural_loop_2d3dV(const MultiLevelProblem *    ml_prob,
+static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
                        const Mesh *                    msh,
                        const MultiLevelSolution *    ml_sol,
                        const unsigned iel,
@@ -906,90 +906,95 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
 
   const unsigned level = mlPdeSys->GetLevelToAssemble();
 
+
+  // Geometry, Global - BEGIN
   Mesh*          msh          = ml_prob._ml_msh->GetLevel(level);    // pointer to the mesh (level) object
-  elem*          el         = msh->GetMeshElements();  // pointer to the elem object in msh (level)
-
-  MultiLevelSolution*  ml_sol        = ml_prob._ml_sol;  // pointer to the multilevel solution object
-  Solution*    sol        = ml_prob._ml_sol->GetSolutionLevel(level);    // pointer to the solution (level) object
-
-  LinearEquationSolver* pdeSys        = mlPdeSys->_LinSolver[level]; // pointer to the equation (level) object
-  SparseMatrix*    KK         = pdeSys->_KK;  // pointer to the global stifness matrix object in pdeSys (level)
-  NumericVector*   RES          = pdeSys->_RES; // pointer to the global residual vector object in pdeSys (level)
 
   const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
   unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
+  // Geometry, Global - END
 
- const std::string solname_u = ml_sol->GetSolName_string_vec()[0];
 
-  //solution variable
-  unsigned soluIndex = ml_sol->GetIndex(solname_u.c_str());    // get the position of "u" in the ml_sol object
+  // Solution, Global - BEGIN
+    MultiLevelSolution*  ml_sol        = ml_prob._ml_sol;  // pointer to the multilevel solution object
+    Solution*    sol        = ml_prob._ml_sol->GetSolutionLevel(level);    // pointer to the solution (level) object
+  // Solution, Global - END
 
-  unsigned solFEType_u = ml_sol->GetSolutionType(soluIndex);    // get the finite element type for "u"
 
-  unsigned soluPdeIndex = mlPdeSys->GetSolPdeIndex(solname_u.c_str());    // get the position of "u" in the pdeSys object
+  // Equation, Global - BEGIN
+  LinearEquationSolver* pdeSys        = mlPdeSys->_LinSolver[level]; // pointer to the equation (level) object
+  NumericVector*   RES          = pdeSys->_RES; // pointer to the global residual vector object in pdeSys (level)
 
+  SparseMatrix*    KK         = pdeSys->_KK;  // pointer to the global stifness matrix object in pdeSys (level)
   SparseMatrix*             JAC = pdeSys->_KK;
 
-  std::vector < adept::adouble >  solu; // local solution
+  RES->zero();
+  KK->zero(); // Set to zero all the entries of the Global Matrix
+  // Equation, Global - END
 
+
+  // Solution, Global, u - BEGIN
+  const std::string solname_u = ml_sol->GetSolName_string_vec()[0];
+  const unsigned soluIndex = ml_sol->GetIndex(solname_u.c_str());    // get the position of "u" in the ml_sol object
+  const unsigned solFEType_u = ml_sol->GetSolutionType(soluIndex);    // get the finite element type for "u"
+  const unsigned soluPdeIndex = mlPdeSys->GetSolPdeIndex(solname_u.c_str());    // get the position of "u" in the pdeSys object
+
+  // Solution, Global, u - END
+
+
+  // Solution, Global, sxx - BEGIN
   const std::string solname_sxx = ml_sol->GetSolName_string_vec()[1];
+  const unsigned solsxxIndex = ml_sol->GetIndex(solname_sxx.c_str());    // get the position of "v" in the ml_sol object
+  const unsigned solFEType_sxx = ml_sol->GetSolutionType(solsxxIndex);    // get the finite element type for "v"
+  const unsigned solsxxPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxx.c_str());    // get the position of "v" in the pdeSys object
 
-  unsigned solsxxIndex = ml_sol->GetIndex(solname_sxx.c_str());    // get the position of "sxx" in the ml_sol object
+  // Solution, Global, sxx - END
 
-  unsigned solFEType_sxx = ml_sol->GetSolutionType(solsxxIndex);    // get the finite element type for "sxx"
-
-  unsigned solsxxPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxx.c_str());    // get the position of "sxx" in the pdeSys object
-
-  std::vector < adept::adouble >  solsxx; // local solution
-
+  // Solution, Global, sxy - BEGIN
   const std::string solname_sxy = ml_sol->GetSolName_string_vec()[2];
+  const unsigned solsxyIndex = ml_sol->GetIndex(solname_sxy.c_str());    // get the position of "v" in the ml_sol object
+  const unsigned solFEType_sxy = ml_sol->GetSolutionType(solsxyIndex);    // get the finite element type for "v"
+  const unsigned solsxyPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxy.c_str());    // get the position of "v" in the pdeSys object
 
-  unsigned solsxyIndex = ml_sol->GetIndex(solname_sxy.c_str());    // get the position of "v" in the ml_sol object
+  // Solution, Global, sxy - END
 
-  unsigned solFEType_sxy = ml_sol->GetSolutionType(solsxyIndex);    // get the finite element type for "v"
-
-  unsigned solsxyPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxy.c_str());    // get the position of "v" in the pdeSys object
-
-  std::vector < adept::adouble >  solsxy; // local solution
-
+  // Solution, Global, syy - BEGIN
   const std::string solname_syy = ml_sol->GetSolName_string_vec()[3];
+  const unsigned solsyyIndex = ml_sol->GetIndex(solname_syy.c_str());    // get the position of "v" in the ml_sol object
+  const unsigned solFEType_syy = ml_sol->GetSolutionType(solsyyIndex);    // get the finite element type for "v"
+  const unsigned solsyyPdeIndex = mlPdeSys->GetSolPdeIndex(solname_syy.c_str());    // get the position of "v" in the pdeSys object
+  // Solution, Global, syy - END
 
-  unsigned solsyyIndex = ml_sol->GetIndex(solname_syy.c_str());    // get the position of "v" in the ml_sol object
 
-  unsigned solFEType_syy = ml_sol->GetSolutionType(solsyyIndex);    // get the finite element type for "v"
 
-  unsigned solsyyPdeIndex = mlPdeSys->GetSolPdeIndex(solname_syy.c_str());    // get the position of "v" in the pdeSys object
+  const unsigned maxSize = static_cast< unsigned >(ceil(pow(3, dim)));          // conservative: based on line3, quad9, hex27
 
-  std::vector < adept::adouble >  solsyy; // local solution
 
+  // Geometry, Local - BEGIN
   std::vector < std::vector < double > > x(dim);    // local coordinates
   unsigned xType = 2; // get the finite element type for "x", it is always 2 (LAGRANGE QUADRATIC)
 
-  std::vector < int > sysDof; // local to global pdeSys dofs
-  std::vector <double> phi;  // local test function
-  std::vector <double> phi_x; // local test function first order partial derivatives
-  std::vector <double> phi_xx; // local test function second order partial derivatives
-  double weight; // gauss point weight
+  for (unsigned i = 0; i < dim; i++)    x[i].reserve(maxSize);
+  // Geometry, Local - END
 
-  std::vector < double > Res; // local redidual vector
-  std::vector < adept::adouble > aResu; // local redidual vector
-  std::vector < adept::adouble > aRessxx; // local redidual vector
 
-  std::vector < adept::adouble > aRessxy; // local redidual vector
-  std::vector < adept::adouble > aRessyy; // local redidual vector
-
+  // Solution, Local - BEGIN
+  std::vector < adept::adouble >  solu; // local solution
+  std::vector < adept::adouble >  solsxx; // local solution
+  std::vector < adept::adouble >  solsxy; // local solution
+  std::vector < adept::adouble >  solsyy; // local solution
   // reserve memory for the local standar vectors
-  const unsigned maxSize = static_cast< unsigned >(ceil(pow(3, dim)));          // conservative: based on line3, quad9, hex27
   solu.reserve(maxSize);
   solsxx.reserve(maxSize);
 
   solsxy.reserve(maxSize);
   solsyy.reserve(maxSize);
+  // Solution, Local - END
 
-  for (unsigned i = 0; i < dim; i++)
-    x[i].reserve(maxSize);
-
-  sysDof.reserve(4 * maxSize);
+  // Solution, Local, phi - BEGIN
+  std::vector <double> phi;  // local test function
+  std::vector <double> phi_x; // local test function first order partial derivatives
+  std::vector <double> phi_xx; // local test function second order partial derivatives
 
   phi.reserve(maxSize);
   phi_x.reserve(maxSize * dim);
@@ -998,20 +1003,34 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
 
   phi_xx.reserve(maxSize * dim2);
 
-  Res.reserve(2 * maxSize);
+  // Solution, Local, phi - END
+
+  // Equation, Local - BEGIN
+  std::vector < int > sysDof; // local to global pdeSys dofs
+  sysDof.reserve(4 * maxSize);
+
+  std::vector < double > Res; // local redidual vector
+
+  std::vector < adept::adouble > aResu;
+  std::vector < adept::adouble > aRessxx;
+  std::vector < adept::adouble > aRessxy;
+  std::vector < adept::adouble > aRessyy;
+
+  Res.reserve(4 * maxSize);
+
   aResu.reserve(maxSize);
   aRessxx.reserve(maxSize);
-
   aRessxy.reserve(maxSize);
   aRessyy.reserve(maxSize);
 
   std::vector < double > Jac; // local Jacobian matrix (ordered by column, adept)
-  Jac.reserve(4 * maxSize * maxSize);
+  Jac.reserve(4 * maxSize * 4 * maxSize);
+  // Equation, Local - END
 
-  KK->zero(); // Set to zero all the entries of the Global Matrix
+  double weight; // gauss point weight
 
 
-double nu =  0.7 /* Poisson ratio value */;
+double nu =  0.1 /* Poisson ratio value */;
 double nu1 = (4.0 * (1.0 - nu)) / (1.0 + nu);
 double nu2 = 2.0 / (1.0 + nu);
 // // // double nu2 = 1. - nu;
@@ -1079,10 +1098,18 @@ double nu2 = 2.0 / (1.0 + nu);
 
     // *** Gauss point loop ***
 
-    for (unsigned ig = 0; ig < msh->_finiteElement[ielGeom][solFEType_sxx]->GetGaussPointNumber(); ig++) {
+    for (unsigned ig = 0; ig < msh->_finiteElement[ielGeom][solFEType_u]->GetGaussPointNumber(); ig++) {
 // *** get gauss point weight, test function and test function partial derivatives ***
 
       msh->_finiteElement[ielGeom][solFEType_sxx]->Jacobian(x, ig, weight, phi, phi_x, phi_xx);
+
+      std::vector < double > xGauss(dim, 0.);
+
+      for (unsigned i = 0; i < nDofs; i++) {
+        for (unsigned jdim = 0; jdim < dim; jdim++) {
+          xGauss[jdim] += x[jdim][i] * phi[i];
+        }
+      }
 
       // evaluate the solution, the solution derivatives and the coordinates in the gauss point
       adept::adouble soluGauss = 0;
@@ -1096,8 +1123,6 @@ double nu2 = 2.0 / (1.0 + nu);
 
       adept::adouble solsyyGauss = 0;
       std::vector < adept::adouble > solsyyGauss_x(dim, 0.);
-
-      std::vector < double > xGauss(dim, 0.);
 
       for (unsigned i = 0; i < nDofs; i++) {
         soluGauss += phi[i] * solu[i];
@@ -1113,7 +1138,7 @@ double nu2 = 2.0 / (1.0 + nu);
           solsxyGauss_x[jdim] += phi_x[i * dim + jdim] * solsxy[i];
           solsyyGauss_x[jdim] += phi_x[i * dim + jdim] * solsyy[i];
 
-          xGauss[jdim] += x[jdim][i] * phi[i];
+// // //           xGauss[jdim] += x[jdim][i] * phi[i];
         }
       }
       // *** phi_i loop ***
@@ -1130,12 +1155,9 @@ double nu2 = 2.0 / (1.0 + nu);
         adept::adouble Mxyxy_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
         adept::adouble Myyyy_syy = nu * phi[i] * solsyyGauss + (1. - nu) * phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
 
-// // //         adept::adouble Mxxyy_syy = nu * phi[i] * solsyyGauss;
-// // //         adept::adouble Myyxx_sxx = nu * phi[i] * solsxxGauss;
-
-
-// // //         adept::adouble Mxxxx1_sxx =  nu * phi[i] * solsxxGauss;
-// // //         adept::adouble Myyyy1_syy = nu * phi[i] * solsyyGauss;
+// // //         adept::adouble Mxxxx_sxx =  phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
+// // //         adept::adouble Mxyxy_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
+// // //         adept::adouble Myyyy_syy =  phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
 
 
         for (unsigned jdim = 0; jdim < dim; jdim++) {
@@ -1159,7 +1181,7 @@ double nu2 = 2.0 / (1.0 + nu);
     // if (dim == 2) {
 
         Bxxu += nu * ( phi_x[i * dim] * soluGauss_x[0] +  phi_x[i * dim + 1] * soluGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soluGauss_x[0];
-        Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
+        Bxyu += ( 1. - nu ) * ( phi_x[i * dim + 1] * soluGauss_x[0] + phi_x[i * dim + 0 ] * soluGauss_x[1] );
         Byyu += nu * ( phi_x[i * dim ] * soluGauss_x[0] + phi_x[i * dim +1] * soluGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * soluGauss_x[1];
 
         Bxxsxx += nu * ( phi_x[i * dim] * solsxxGauss_x[0] +  phi_x[i * dim + 1] * solsxxGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxGauss_x[0];
