@@ -48,6 +48,8 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
+      static constexpr double a = 0.00001;
+
 
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
@@ -189,7 +191,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+    // // // static constexpr double a = 0.001;
 };
 
 
@@ -217,7 +219,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+    // // // static constexpr double a = 0.001;
 };
 
 
@@ -243,7 +245,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+    // // // static constexpr double a = 0.001;
 };
 
 
@@ -294,7 +296,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+    // // // static constexpr double a = 0.001;
 };
 
 
@@ -304,7 +306,9 @@ class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> 
 public:
     type value(const std::vector<type>& x) const {
         type base = sin(2*pi*x[0])*sin(2*pi*x[1]);
-        return (1. - a * 4096.*pow(pi, 8)) * base;; // 4096π⁸ = (8π²)⁴
+        return (1. - a * 4096.*pow(pi, 8)) * base; // 4096π⁸ = (8π²)⁴;
+                // // // return  base; // 4096π⁸ = (8π²)⁴
+
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
@@ -323,7 +327,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+    // // // static constexpr double a = 0.001;
 
 };
 
@@ -494,7 +498,7 @@ int main(int argc, char** args) {
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 6;
+  unsigned maxNumberOfMeshes = 4;
 
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
 
@@ -582,7 +586,7 @@ int main(int argc, char** args) {
 
       mlSol.GenerateBdc("q", "Steady", &ml_prob);
 
-      NonLinearImplicitSystem& system = ml_prob.add_system<NonLinearImplicitSystem>(system_biharmonic_HM._system_name);
+      LinearImplicitSystem& system = ml_prob.add_system<LinearImplicitSystem>(system_biharmonic_HM._system_name);
       system.AddSolutionToSystemPDE("u");
       system.AddSolutionToSystemPDE("sxx");
       system.AddSolutionToSystemPDE("sxy");
@@ -603,32 +607,52 @@ int main(int argc, char** args) {
 
       system.MGsolve();
 
-auto put_err = [&](const char* name, Math::Function<double>* exact,
-                         std::vector<std::vector<double>>& L2, std::vector<std::vector<double>>& H1) {
-        const auto norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, name, exact);
-        L2[i][j] = norm.first;
-        H1[i][j] = norm.second;
-      };
+      std::pair<double, double> norm;
 
-      put_err("u",   &system_biharmonic_HM_function_zero_on_boundary_1,l2Norm_u,   semiNorm_u);
-      put_err("sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx, l2Norm_sxx, semiNorm_sxx);
-      put_err("sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy, l2Norm_sxy, semiNorm_sxy);
-      put_err("syy", &system_biharmonic_HM_function_zero_on_boundary_syy, l2Norm_syy, semiNorm_syy);
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "u", &system_biharmonic_HM_function_zero_on_boundary_1);
+      l2Norm_u[i][j] = norm.first;
+      semiNorm_u[i][j] = norm.second;
 
-      put_err("ud",   &system_biharmonic_HM_function_zero_on_boundary_u_d,   l2Norm_ud,   semiNorm_ud);
-      put_err("sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxx,  l2Norm_sxxd, semiNorm_sxxd);
-      put_err("sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxy,  l2Norm_sxyd, semiNorm_sxyd);
-      put_err("syyd", &system_biharmonic_HM_function_zero_on_boundary_syy,  l2Norm_syyd, semiNorm_syyd);
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx);
+      l2Norm_sxx[i][j] = norm.first;
+      semiNorm_sxx[i][j] = norm.second;
 
-      put_err("q",    &system_biharmonic_HM_function_zero_on_boundary_q,    l2Norm_q,    semiNorm_q);
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy);
+      l2Norm_sxy[i][j] = norm.first;
+      semiNorm_sxy[i][j] = norm.second;
 
-      // Output VTK
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "syy", &system_biharmonic_HM_function_zero_on_boundary_syy);
+      l2Norm_syy[i][j] = norm.first;
+      semiNorm_syy[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "ud", &system_biharmonic_HM_function_zero_on_boundary_u_d);
+      l2Norm_ud[i][j] = norm.first;
+      semiNorm_ud[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxxd);
+      l2Norm_sxxd[i][j] = norm.first;
+      semiNorm_sxxd[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxyd);
+      l2Norm_sxyd[i][j] = norm.first;
+      semiNorm_sxyd[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
+      l2Norm_syyd[i][j] = norm.first;
+      semiNorm_syyd[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "q", &system_biharmonic_HM_function_zero_on_boundary_q);
+      l2Norm_q[i][j] = norm.first;
+      semiNorm_q[i][j] = norm.second;
+
       VTKWriter vtkIO(&mlSol);
       vtkIO.Write("test", Files::_application_output_directory, "biquadratic", {"All"}, i);
-
     }
   }
+  // ======= Convergence study, mesh loop and FE loop - END =========================
 
+
+  // ======= Convergence study, print convergence rate - BEGIN =========================
   auto print_error = [](const std::vector<std::vector<double>>& error, const std::string& title) {
     std::cout << "\n" << title << "\nLEVEL\tFIRST\t\t\tSERENDIPITY\t\tSECOND\n";
     for (unsigned i = 0; i < error.size(); ++i) {
@@ -654,17 +678,17 @@ auto put_err = [&](const char* name, Math::Function<double>* exact,
   print_error(l2Norm_syy, "L2 ERROR for syy");
   print_error(semiNorm_syy, "H1 ERROR for syy");
 
-    print_error(l2Norm_u, "L2 ERROR for ud");
-  print_error(semiNorm_u, "H1 ERROR for ud");
-  print_error(l2Norm_sxx, "L2 ERROR for sxxd");
-  print_error(semiNorm_sxx, "H1 ERROR for sxxd");
-  print_error(l2Norm_sxy, "L2 ERROR for sxyd");
-  print_error(semiNorm_sxy, "H1 ERROR for sxyd");
-  print_error(l2Norm_syy, "L2 ERROR for syyd");
-  print_error(semiNorm_syy, "H1 ERROR for syyd");
+  print_error(l2Norm_ud, "L2 ERROR for ud");
+  print_error(semiNorm_ud, "H1 ERROR for ud");
+  print_error(l2Norm_sxxd, "L2 ERROR for sxxd");
+  print_error(semiNorm_sxxd, "H1 ERROR for sxxd");
+  print_error(l2Norm_sxyd, "L2 ERROR for sxyd");
+  print_error(semiNorm_sxyd, "H1 ERROR for sxyd");
+  print_error(l2Norm_syyd, "L2 ERROR for syyd");
+  print_error(semiNorm_syyd, "H1 ERROR for syyd");
 
-    print_error(l2Norm_syy, "L2 ERROR for q");
-  print_error(semiNorm_syy, "H1 ERROR for q");
+  print_error(l2Norm_q, "L2 ERROR for q");
+  print_error(semiNorm_q, "H1 ERROR for q");
 
   return 0;
 }

@@ -904,7 +904,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
 
   //  extract pointers to the several objects that we are going to use
 
-  NonLinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<NonLinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
+  LinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<LinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
 
 
 //   LinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<NonLinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
@@ -1060,8 +1060,8 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   KK->zero(); // Set to zero all the entries of the Global Matrix
 
 
-double alpha = .001 ;
-double nu =  0.5 /* Poisson ratio value */;
+double alpha = .00001 ;
+double nu =  0. /* Poisson ratio value */;
 
 
 
@@ -1292,7 +1292,7 @@ double nu =  0.5 /* Poisson ratio value */;
     adept::adouble Bxyd = 0.;
     adept::adouble Byyd = 0.;
 
-       if (dim == 2) {
+       // if (dim == 2) {
 
         Bxxu += phi_x[i * dim] * soluGauss_x[0] + nu * phi_x[i * dim + 1] * soluGauss_x[1];
 
@@ -1319,7 +1319,7 @@ double nu =  0.5 /* Poisson ratio value */;
 
 
 
-    }
+    // }
 
 
 
