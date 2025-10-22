@@ -82,7 +82,7 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-
+/*
  constexpr double nu = 0.;
  constexpr double c = 64.;
 
@@ -230,7 +230,7 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
-
+/*
 
 /*
 template <class type = double>
@@ -305,7 +305,7 @@ private:
 };
 */
 
-
+/*
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_s1 : public Math::Function<type> {
 
@@ -415,6 +415,171 @@ public:
         // From analytic derivation:
         // ∇² s2 = 16(1 - nu)(0.25 - 3X^2)(0.25 - 3Y^2)
         return c * 16.0 * (1.0 - nu) * (0.25 - 3.0 * X * X) * (0.25 - 3.0 * Y * Y);
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};*/
+
+
+template <class type = double>
+class Function_Zero_on_boundary_7 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return sin(2.* pi * x[0]) * sin(2. * pi * x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 2. * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
+        solGrad[1] = 2. * pi * sin(2. * pi * x[0]) * cos(2.* pi * x[1]);
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return -8. * pi * pi * sin(2.* pi * x[0]) * sin(2.*pi * x[1]);
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+template <class type = double>
+class Function_Zero_on_boundary_7_Laplacian : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return -8.*pi*pi * sin(2.*pi*x[0]) * sin(2.*pi*x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = -16. * pi * pi * pi * cos(2. * pi*x[0]) * sin(2. * pi*x[1]);
+        solGrad[1] = -16. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2.* pi * x[1]);
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return 64. * pi * pi * pi * pi * sin(2. * pi*x[0]) * sin(2. * pi * x[1]);
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+template <class type = double>
+class Function_Zero_on_boundary_7_W : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 8.* pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 16. * pi * pi * pi * cos(2. * pi*x[0]) * sin(2. * pi*x[1]);
+        solGrad[1] = 16. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2.* pi * x[1]);
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return -64. * pi * pi * pi * pi * sin(2. * pi*x[0]) * sin(2. * pi * x[1]);
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_s1 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 0. ;
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 0.;
+        solGrad[1] = 0.;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_s2 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 4. * pi * pi * cos(2. * pi * x[0]) * cos(2. * pi * x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = -8. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        solGrad[1] = -8. * pi * pi * pi * cos(2. * pi * x[0]) * sin( 2. * pi*x[1] );
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return -32. * pi * pi * pi * pi * cos(2.*pi*x[0]) * cos(2.*pi*x[1]);
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+
+template <class type = double>
+class Function_Zero_on_boundary_4_deviatoric_s1 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 0.;
+        solGrad[1] = 0.;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+
+template <class type = double>
+class Function_Zero_on_boundary_4_deviatoric_s2 : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 4. * pi * pi * cos(2. * pi * x[0]) * cos(2. * pi * x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = - 8. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        solGrad[1] = - 8. * pi * pi * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return - 32. * pi * pi * pi * pi * cos(2. * pi * x[0]) * cos(2. * pi * x[1]);
     }
 
 private:
@@ -539,7 +704,7 @@ int main(int argc, char** args) {
 
     // ======= Convergence study, mesh setup - BEGIN =========================
 
-  const unsigned maxNumberOfMeshes = 4;
+  const unsigned maxNumberOfMeshes = 8;
 
   std::vector<std::vector<double>> l2Norm_u(maxNumberOfMeshes), semiNorm_u(maxNumberOfMeshes);
   std::vector<std::vector<double>> l2Norm_s1(maxNumberOfMeshes), semiNorm_s1(maxNumberOfMeshes);

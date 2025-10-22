@@ -1030,7 +1030,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   double weight; // gauss point weight
 
 
-double nu =  0.1 /* Poisson ratio value */;
+double nu =  .5 /* Poisson ratio value */;
 double nu1 = (4.0 * (1.0 - nu)) / (1.0 + nu);
 double nu2 = 2.0 / (1.0 + nu);
 // // // double nu2 = 1. - nu;
@@ -1151,9 +1151,9 @@ double nu2 = 2.0 / (1.0 + nu);
         adept::adouble Laplace_syy = 0.;
 
 
-        adept::adouble Mxxxx_sxx =  nu * phi[i] * solsxxGauss + (1. - nu) * phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
-        adept::adouble Mxyxy_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
-        adept::adouble Myyyy_syy = nu * phi[i] * solsyyGauss + (1. - nu) * phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
+        adept::adouble M_sxx = phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
+        adept::adouble M_sxy = 2.* (1. - nu) * phi[i] * solsxyGauss;
+        adept::adouble M_syy = phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
 
 // // //         adept::adouble Mxxxx_sxx =  phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
 // // //         adept::adouble Mxyxy_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
@@ -1174,19 +1174,24 @@ double nu2 = 2.0 / (1.0 + nu);
     adept::adouble Bxxu = 0.;
     adept::adouble Bxyu = 0.;
     adept::adouble Byyu = 0.;
-    adept::adouble Bxxsxx = 0.;
-    adept::adouble Bxysxy = 0.;
-    adept::adouble Byysyy = 0.;
+    adept::adouble B_sxx = 0.;
+    adept::adouble B_sxy = 0.;
+    adept::adouble B_syy = 0.;
 
     // if (dim == 2) {
 
-        Bxxu += nu * ( phi_x[i * dim] * soluGauss_x[0] +  phi_x[i * dim + 1] * soluGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soluGauss_x[0];
-        Bxyu += ( 1. - nu ) * ( phi_x[i * dim + 1] * soluGauss_x[0] + phi_x[i * dim + 0 ] * soluGauss_x[1] );
-        Byyu += nu * ( phi_x[i * dim ] * soluGauss_x[0] + phi_x[i * dim +1] * soluGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * soluGauss_x[1];
+        Bxxu += phi_x[i * dim] * soluGauss_x[0] + nu * phi_x[i * dim + 1] * soluGauss_x[1];
 
-        Bxxsxx += nu * ( phi_x[i * dim] * solsxxGauss_x[0] +  phi_x[i * dim + 1] * solsxxGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxGauss_x[0];
-        Bxysxy +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1 ] * solsxyGauss_x[0] );
-        Byysyy += nu * ( phi_x[i * dim ] * solsyyGauss_x[0] + phi_x[i * dim +1] * solsyyGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyyGauss_x[1];
+        Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
+
+        Byyu += nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
+
+
+        B_sxx += phi_x[i * dim] * solsxxGauss_x[0] + nu * phi_x[i * dim + 1] * solsxxGauss_x[1];
+
+        B_sxy +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1] * solsxyGauss_x[0] );
+
+        B_syy += nu * phi_x[i * dim] * solsyyGauss_x[0] + phi_x[i * dim + 1] * solsyyGauss_x[1];
 
 
 
@@ -1194,10 +1199,10 @@ double nu2 = 2.0 / (1.0 + nu);
         adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian(xGauss) * phi[i];
 
         // System residuals - signs adjusted to match matrix form
-     aResu[i] += ( Bxxsxx + Bxysxy + Byysyy + F_term ) * weight;  // M*W + B^T*U = 0
-     aRessxx[i] += ( Bxxu + Mxxxx_sxx  ) * weight;  // B*W + ν1*C1*S1 + ν1*C2*S2 = -ν2*F
-     aRessxy[i] += ( Bxyu + Mxyxy_sxy ) * weight;  // C1^T*W + M*S1 = 0
-     aRessyy[i] += ( Byyu + Myyyy_syy ) * weight;  // C2^T*W + M*S2 = 0
+     aResu[i] += ( B_sxx + B_sxy + B_syy + F_term ) * weight;  // M*W + B^T*U = 0
+     aRessxx[i] += ( Bxxu + M_sxx  ) * weight;  // B*W + ν1*C1*S1 + ν1*C2*S2 = -ν2*F
+     aRessxy[i] += ( Bxyu + M_sxy ) * weight;  // C1^T*W + M*S1 = 0
+     aRessyy[i] += ( Byyu + M_syy ) * weight;  // C2^T*W + M*S2 = 0
 
       } // end phi_i loop
 

@@ -325,38 +325,40 @@ void LinearEquationSolverPetsc::MGSolve(const bool ksp_clean) {
         }
         KSPSetUp(_ksp);
     }
-
-    // // --- Apply boundary conditions consistently ---
-    // ZerosBoundaryResiduals();
-
-    // // --- Finalize assembly before dump and solve ---
-    // MatAssemblyBegin(KK, MAT_FINAL_ASSEMBLY);
-    // MatAssemblyEnd(KK, MAT_FINAL_ASSEMBLY);
-
-    // --- Dump matrix and RHS for verification ---
-    // {
-    //     PetscViewer viewer;
-    //     PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_dump.m", &viewer);
-    //     PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB);
-    //     MatView(KK, viewer);
-    //     PetscViewerPopFormat(viewer);
-    //     PetscViewerDestroy(&viewer);
-    // }
-    //
-    // {
-    //     PetscViewer viewer_vec;
-    //     PetscViewerASCIIOpen(PETSC_COMM_WORLD, "rhs_dump.m", &viewer_vec);
-    //     PetscViewerPushFormat(viewer_vec, PETSC_VIEWER_ASCII_MATLAB);
-    //     VecView((static_cast<PetscVector*>(_RES))->vec(), viewer_vec);
-    //     PetscViewerPopFormat(viewer_vec);
-    //     PetscViewerDestroy(&viewer_vec);
-    // }
-
-//     PC pc;
-// KSPGetPC(_ksp, &pc);
-// PetscViewer viewer;
-// PetscViewerASCIIGetStdout(PETSC_COMM_WORLD, &viewer);
-// PCView(pc, viewer);
+// // // //======================BEGIN dump matrix====================
+// // //     // // --- Apply boundary conditions consistently ---
+// // //     ZerosBoundaryResiduals();
+// // //
+// // //     // --- Finalize assembly before dump and solve ---
+// // //     MatAssemblyBegin(KK, MAT_FINAL_ASSEMBLY);
+// // //     MatAssemblyEnd(KK, MAT_FINAL_ASSEMBLY);
+// // //
+// // //     // // --- Dump matrix and RHS for verification ---
+// // //     {
+// // //         PetscViewer viewer;
+// // //         PetscViewerASCIIOpen(PETSC_COMM_WORLD, "matrix_dump.m", &viewer);
+// // //         PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB);
+// // //         MatView(KK, viewer);
+// // //         PetscViewerPopFormat(viewer);
+// // //         PetscViewerDestroy(&viewer);
+// // //     }
+// // //
+// // //     {
+// // //         PetscViewer viewer_vec;
+// // //         PetscViewerASCIIOpen(PETSC_COMM_WORLD, "rhs_dump.m", &viewer_vec);
+// // //         PetscViewerPushFormat(viewer_vec, PETSC_VIEWER_ASCII_MATLAB);
+// // //         VecView((static_cast<PetscVector*>(_RES))->vec(), viewer_vec);
+// // //         PetscViewerPopFormat(viewer_vec);
+// // //         PetscViewerDestroy(&viewer_vec);
+// // //     }
+// // //
+// // //     PC pc;
+// // // KSPGetPC(_ksp, &pc);
+// // // PetscViewer viewer;
+// // // PetscViewerASCIIGetStdout(PETSC_COMM_WORLD, &viewer);
+// // // PCView(pc, viewer);
+// // //
+// // // //======================END dump matrix====================
 
     // --- Solve system (direct LU, PREONLY) ---
     KSPSolve(_ksp,

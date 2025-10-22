@@ -47,6 +47,9 @@ using namespace femus;
 
 namespace Domains {
 
+      static constexpr double alpha = 0.001;
+
+
 namespace  square_m05p05  {
 
 template <class type = double>
@@ -144,7 +147,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double alpha = 0.001;
+    // static constexpr double alpha = 0.001;
 };
 
 
@@ -172,7 +175,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double alpha = 0.001;
+    // static constexpr double alpha = 0.001;
 };
 
 
@@ -200,7 +203,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double alpha = 0.001;
+    // static constexpr double alpha = 0.001;
 };
 
 
@@ -230,7 +233,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double alpha = 0.001;
+    // static constexpr double alpha = 0.001;
 };
 
 
@@ -344,7 +347,7 @@ system_biharmonic_HM._assemble_function_for_rhs = &system_biharmonic_HM_function
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 9;
+  unsigned maxNumberOfMeshes = 5;
 
   // // // std::vector < std::vector < double > > l2Norm;
   // // // l2Norm.resize(maxNumberOfMeshes);
