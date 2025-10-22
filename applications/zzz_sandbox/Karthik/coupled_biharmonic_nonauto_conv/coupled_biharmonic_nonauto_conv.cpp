@@ -355,7 +355,7 @@ int main(int argc, char** args) {
     // ======= Convergence study setup - BEGIN ========================
 
     // Mesh, Number of refinements
-    unsigned max_number_of_meshes = 8; // Reduced to 6 for faster execution during testing
+    unsigned max_number_of_meshes = 6; // Reduced to 6 for faster execution during testing
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh, all levels - for incremental refinement

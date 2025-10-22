@@ -1014,7 +1014,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   KK->zero(); // Set to zero all the entries of the Global Matrix
 
 
-double alpha = .001 ;
+double alpha = .000001 ;
 
 
 
