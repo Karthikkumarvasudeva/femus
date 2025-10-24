@@ -1,17 +1,17 @@
 #ifndef __femus_biharmonic_HM_hpp__
 #define __femus_biharmonic_HM_hpp__
  
-#include "FemusInit.hpp"  //for the adept stack
-
+#include "FemusInit.hpp"
 #include "MultiLevelProblem.hpp"
 #include "MultiLevelMesh.hpp"
 #include "MultiLevelSolution.hpp"
 #include "NonLinearImplicitSystem.hpp"
-
 #include "LinearEquationSolver.hpp"
 #include "NumericVector.hpp"
 #include "SparseMatrix.hpp"
 #include "Assemble_jacobian.hpp"
+#include "Assemble_unknown_jacres.hpp" // Required for ElementJacRes
+#include "CurrentElem.hpp"
 /**
  * Given the non linear problem
  *
@@ -895,356 +895,362 @@ static void natural_loop_2d3dV(const MultiLevelProblem *    ml_prob,
 // // // //========= BOUNDARY_IMPLEMENTATION_S2 - END ==================
 
 
-static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
-  //  ml_prob is the global object from/to where get/set all the data
-  //  level is the level of the PDE system to be assembled
+template < class system_type, class real_num, class real_num_mov >
+static void AssembleBilaplaceProblem_AD(
+     const std::vector < std::vector < /*const*/ elem_type_templ_base<real_num, real_num_mov> * > > & elem_all,
+                            const std::vector < std::vector < /*const*/ elem_type_templ_base<real_num_mov, real_num_mov> * > > & elem_all_for_domain,
+                            const std::vector<Gauss> & quad_rules,
+                            system_type * mlPdeSys,
+                            MultiLevelMesh * ml_mesh_in,
+                            MultiLevelSolution * ml_sol_in,
+                            const std::vector< Unknown > &  unknowns,
+                            const std::vector< Math::Function< double > * > & source_functions) {
 
-  // call the adept stack object
-  adept::Stack& s = FemusInit::_adeptStack;
+    // level is the level of the PDE system to be assembled
+    const unsigned level = mlPdeSys->GetLevelToAssemble();
+    const bool assembleMatrix = mlPdeSys->GetAssembleMatrix();
 
-  //  extract pointers to the several objects that we are going to use
+    Mesh* msh = ml_mesh_in->GetLevel(level);
+    MultiLevelSolution* ml_sol = ml_sol_in;
+    Solution* sol = ml_sol->GetSolutionLevel(level);
 
-  NonLinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<NonLinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
+    LinearEquationSolver* pdeSys = mlPdeSys->_LinSolver[level];
+    SparseMatrix* KK = pdeSys->_KK;
+    NumericVector* RES = pdeSys->_RES;
 
-  const unsigned level = mlPdeSys->GetLevelToAssemble();
+    const unsigned dim = msh->GetDimension();
+    const unsigned iproc = msh->processor_id();
 
-  Mesh*          msh          = ml_prob._ml_msh->GetLevel(level);    // pointer to the mesh (level) object
-  elem*          el         = msh->GetMeshElements();  // pointer to the elem object in msh (level)
+    RES->zero();
+    if (assembleMatrix) KK->zero();
 
-  MultiLevelSolution*  ml_sol        = ml_prob._ml_sol;  // pointer to the multilevel solution object
-  Solution*    sol        = ml_prob._ml_sol->GetSolutionLevel(level);    // pointer to the solution (level) object
+    // Keep same conventions as your code
+    constexpr unsigned int space_dim = 3; // max spatial dimension
+    const unsigned int dim_offset_grad = dim;
 
-  LinearEquationSolver* pdeSys        = mlPdeSys->_LinSolver[level]; // pointer to the equation (level) object
-  SparseMatrix*    KK         = pdeSys->_KK;  // pointer to the global stifness matrix object in pdeSys (level)
-  NumericVector*   RES          = pdeSys->_RES; // pointer to the global residual vector object in pdeSys (level)
+    // Jacobian geometry containers
+    std::vector< std::vector< real_num_mov > > JacI_qp(space_dim);
+    std::vector< std::vector< real_num_mov > > Jac_qp(dim);
+    for (unsigned d = 0; d < dim; d++) Jac_qp[d].resize(space_dim);
+    for (unsigned d = 0; d < space_dim; d++) JacI_qp[d].resize(dim);
 
-  const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
-  unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
+    real_num_mov detJac_qp = (real_num_mov)0.0;
+    real_num_mov weight_qp = (real_num_mov)0.0;
 
- const std::string solname_u = ml_sol->GetSolName_string_vec()[0];
+    unsigned xType = CONTINUOUS_BIQUADRATIC; // geometry FE type
 
-  //solution variable
-  unsigned soluIndex = ml_sol->GetIndex(solname_u.c_str());    // get the position of "u" in the ml_sol object
-  unsigned solFEType_u = ml_sol->GetSolutionType(soluIndex);    // get the finite element type for "u"
-  unsigned soluPdeIndex = mlPdeSys->GetSolPdeIndex(solname_u.c_str());    // get the position of "u" in the pdeSys object
+    CurrentElem < real_num_mov > geom_element(dim, msh);
+    Phi < real_num_mov > geom_element_phi_dof_qp(dim_offset_grad);
 
-  SparseMatrix*             JAC = pdeSys->_KK;
-
-  std::vector < adept::adouble >  solu; // local solution
-
-
-  const std::string solname_v = ml_sol->GetSolName_string_vec()[1];
-  unsigned solvIndex = ml_sol->GetIndex(solname_v.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_v = ml_sol->GetSolutionType(solvIndex);    // get the finite element type for "v"
-  unsigned solvPdeIndex = mlPdeSys->GetSolPdeIndex(solname_v.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solv; // local solution
-
-  const std::string solname_s1 = ml_sol->GetSolName_string_vec()[2];
-  unsigned sols1Index = ml_sol->GetIndex(solname_s1.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_s1 = ml_sol->GetSolutionType(sols1Index);    // get the finite element type for "v"
-  unsigned sols1PdeIndex = mlPdeSys->GetSolPdeIndex(solname_s1.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  sols1; // local solution
-
-  const std::string solname_s2 = ml_sol->GetSolName_string_vec()[3];
-  unsigned sols2Index = ml_sol->GetIndex(solname_s2.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_s2 = ml_sol->GetSolutionType(sols2Index);    // get the finite element type for "v"
-  unsigned sols2PdeIndex = mlPdeSys->GetSolPdeIndex(solname_s2.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  sols2; // local solution
-
-  const std::string solname_p = ml_sol->GetSolName_string_vec()[4];
-  unsigned solpIndex = ml_sol->GetIndex(solname_p.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_p = ml_sol->GetSolutionType(solpIndex);    // get the finite element type for "v"
-  unsigned solpPdeIndex = mlPdeSys->GetSolPdeIndex(solname_p.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solp; // local solution
-
-
-  std::vector < std::vector < double > > x(dim);    // local coordinates
-  unsigned xType = 2; // get the finite element type for "x", it is always 2 (LAGRANGE QUADRATIC)
-
-  std::vector < int > sysDof; // local to global pdeSys dofs
-  std::vector <double> phi;  // local test function
-  std::vector <double> phi_x; // local test function first order partial derivatives
-  std::vector <double> phi_xx; // local test function second order partial derivatives
-  double weight; // gauss point weight
-
-  std::vector < double > Res; // local redidual vector
-  std::vector < adept::adouble > aResu; // local redidual vector
-  std::vector < adept::adouble > aResv; // local redidual vector
-
-  std::vector < adept::adouble > aRess1; // local redidual vector
-  std::vector < adept::adouble > aRess2; // local redidual vector
-  std::vector < adept::adouble > aResp; // local redidual vector
-
-  // reserve memory for the local standar vectors
-  const unsigned maxSize = static_cast< unsigned >(ceil(pow(3, dim)));          // conservative: based on line3, quad9, hex27
-  solu.reserve(maxSize);
-  solv.reserve(maxSize);
-
-  sols1.reserve(maxSize);
-  sols2.reserve(maxSize);
-
-  solp.reserve(maxSize);
-
-
-  for (unsigned i = 0; i < dim; i++)
-    x[i].reserve(maxSize);
-
-  sysDof.reserve(5 * maxSize);
-
-  phi.reserve(maxSize);
-  phi_x.reserve(maxSize * dim);
-// // //   unsigned dim2 = (3 * (dim - 1) + !(dim - 1));        // dim2 is the number of second order partial derivatives (1,3,6 depending on the dimension)
-    unsigned dim2 = (6 * (dim - 1) + !(dim - 1));        // dim2 is the number of second order partial derivatives (1,3,6 depending on the dimension)
-
-  phi_xx.reserve(maxSize * dim2);
-
-  Res.reserve(2 * maxSize);
-  aResu.reserve(maxSize);
-  aResv.reserve(maxSize);
-
-  aRess1.reserve(maxSize);
-  aRess2.reserve(maxSize);
-
-  aResp.reserve(maxSize);
-
-
-  std::vector < double > Jac; // local Jacobian matrix (ordered by column, adept)
-  Jac.reserve(5 * maxSize * maxSize);
-
-  KK->zero(); // Set to zero all the entries of the Global Matrix
-
-
-double alpha = .001 ;
-
-
-
-  for (int iel = msh->GetElementOffset(iproc); iel < msh->GetElementOffset(iproc + 1); iel++) {
-
-    short unsigned ielGeom = msh->GetElementType(iel); 
-
-// // //     unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
-    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_p);    // number of solution element dofs
-
-
-
-    unsigned nDofs2 = msh->GetElementDofNumber(iel, xType);    // number of coordinate element dofs
-
-    std::vector<unsigned> Sol_n_el_dofs_Mat_vol(5, nDofs);
-
-    // resize local arrays
-    sysDof.resize(5 * nDofs);
-    solu.resize(nDofs);
-    solv.resize(nDofs);
-    sols1.resize(nDofs);
-    sols2.resize(nDofs);
-    solp.resize(nDofs);
-
-
-    for (int i = 0; i < dim; i++) {
-      x[i].resize(nDofs2);
+    // Unknowns setup - expect 5 unknowns for Ciarlet-Raviart formulation
+    const unsigned int n_unknowns = mlPdeSys->GetSolPdeIndex().size();
+    if (n_unknowns < 5) {
+        std::cerr << "AssembleBilaplaceProblem: expected 5 unknowns (u, v, s1, s2, p) but found " << n_unknowns << "\n";
+        return;
     }
 
-    aResu.assign(nDofs, 0.);    //resize
-    aResv.assign(nDofs, 0.);    //resize
-    aRess1.assign(nDofs, 0.0);
-    aRess2.assign(nDofs, 0.0);
-    aResp.assign(nDofs, 0.0);
+    std::vector < UnknownLocal < real_num > > unknowns_local(n_unknowns);
+    std::vector < Phi < real_num > > unknowns_phi_dof_qp(n_unknowns, Phi< real_num >(dim_offset_grad));
 
-
-    // local storage of global mapping and solution
-    for (unsigned i = 0; i < nDofs; i++) {
-
-// // //       unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_u);    // global to global mapping between solution node and solution dof
-      unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_v);    // global to global mapping between solution node and solution dof
-
-
-
-      solu[i]          = (*sol->_Sol[soluIndex])(solDof);      // global extraction and local storage for the solution
-      solv[i]          = (*sol->_Sol[solvIndex])(solDof);      // global extraction and local storage for the solution
-      sols1[i]         = (*sol->_Sol[sols1Index])(solDof);      // s1  -> secondary row2, col2
-      sols2[i]         = (*sol->_Sol[sols2Index])(solDof);      // s2  -> secondary row1, col2
-      solp[i]         = (*sol->_Sol[solpIndex])(solDof);      // s2  -> secondary row1, col2
-
-
-
-      sysDof[i]             = pdeSys->GetSystemDof(soluIndex, soluPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[nDofs + i]     = pdeSys->GetSystemDof(solvIndex, solvPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[2 * nDofs + i] = pdeSys->GetSystemDof(sols1Index, sols1PdeIndex, i, iel); // s1
-      sysDof[3 * nDofs + i] = pdeSys->GetSystemDof(sols2Index, sols2PdeIndex, i, iel); // s2
-      sysDof[4 * nDofs + i] = pdeSys->GetSystemDof(solpIndex, solpPdeIndex, i, iel); // s2
-
-
+    for (int u = 0; u < (int)n_unknowns; u++) {
+        unknowns_local[u].initialize(dim_offset_grad, unknowns[u], ml_sol, mlPdeSys);
     }
 
-    // local storage of coordinates
-    for (unsigned i = 0; i < nDofs2; i++) {
-      unsigned xDof  = msh->GetSolutionDof(i, iel, xType); // global to global mapping between coordinates node and coordinate dof
+    ElementJacRes < real_num > unk_element_jac_res(dim, unknowns_local);
 
-      for (unsigned jdim = 0; jdim < dim; jdim++) {
-        x[jdim][i] = (*msh->GetTopology()->_Sol[jdim])(xDof);  // global extraction and local storage for the element coordinates
-      }
-    }
+    // element loop: each process loops only on the elements it owns
+    for (int iel = msh->GetElementOffset(iproc); iel < msh->GetElementOffset(iproc + 1); iel++) {
 
-    // start a new recording of all the operations involving adept::adouble variables
-    s.new_recording();
+        // Geometry
+        geom_element.set_coords_at_dofs_and_geom_type(iel, xType);
+        geom_element.set_elem_center_3d(iel, xType);
+        const short unsigned ielGeom = geom_element.geom_type();
 
-    // *** Gauss point loop ***
-
-    for (unsigned ig = 0; ig < msh->_finiteElement[ielGeom][solFEType_v]->GetGaussPointNumber(); ig++) {
-// *** get gauss point weight, test function and test function partial derivatives ***
-
-      msh->_finiteElement[ielGeom][solFEType_v]->Jacobian(x, ig, weight, phi, phi_x, phi_xx);
-
-      // evaluate the solution, the solution derivatives and the coordinates in the gauss point
-      adept::adouble soluGauss = 0;
-      std::vector < adept::adouble > soluGauss_x(dim, 0.);
-
-      adept::adouble solvGauss = 0;
-      std::vector < adept::adouble > solvGauss_x(dim, 0.);
-
-      adept::adouble sols1Gauss = 0;
-      std::vector < adept::adouble > sols1Gauss_x(dim, 0.);
-
-      adept::adouble sols2Gauss = 0;
-      std::vector < adept::adouble > sols2Gauss_x(dim, 0.);
-
-      adept::adouble solpGauss = 0;
-      std::vector < adept::adouble > solpGauss_x(dim, 0.);
-
-
-      std::vector < double > xGauss(dim, 0.);
-
-      for (unsigned i = 0; i < nDofs; i++) {
-        soluGauss += phi[i] * solu[i];
-        solvGauss += phi[i] * solv[i];
-
-        sols1Gauss += phi[i] * sols1[i];
-        sols2Gauss += phi[i] * sols2[i];
-
-        solpGauss += phi[i] * solp[i];
-
-
-        for (unsigned jdim = 0; jdim < dim; jdim++) {
-          soluGauss_x[jdim] += phi_x[i * dim + jdim] * solu[i];
-          solvGauss_x[jdim] += phi_x[i * dim + jdim] * solv[i];
-
-          sols1Gauss_x[jdim] += phi_x[i * dim + jdim] * sols1[i];
-          sols2Gauss_x[jdim] += phi_x[i * dim + jdim] * sols2[i];
-
-          solpGauss_x[jdim] += phi_x[i * dim + jdim] * solp[i];
-
-
-          xGauss[jdim] += x[jdim][i] * phi[i];
-        }
-      }
-      // *** phi_i loop ***
-      for (unsigned i = 0; i < nDofs; i++) {
-
-        adept::adouble Laplace_u = 0.;
-        adept::adouble Laplace_v = 0.;
-
-        adept::adouble Laplace_s1 = 0.;
-        adept::adouble Laplace_s2 = 0.;
-        adept::adouble Laplace_p = 0.;
-
-
-        adept::adouble M_u = phi[i] * soluGauss;
-        adept::adouble M_v = phi[i] * solvGauss;
-        adept::adouble M_s1 = phi[i] * sols1Gauss;
-        adept::adouble M_s2 = phi[i] * sols2Gauss;
-        adept::adouble M_p = phi[i] * solpGauss;
-
-
-        for (unsigned jdim = 0; jdim < dim; jdim++) {
-          Laplace_u   +=  - phi_x[i * dim + jdim] * soluGauss_x[jdim];
-          Laplace_v   +=  - phi_x[i * dim + jdim] * solvGauss_x[jdim];
-
-          Laplace_s1   +=  - phi_x[i * dim + jdim] * sols1Gauss_x[jdim];
-          Laplace_s2   +=  - phi_x[i * dim + jdim] * sols2Gauss_x[jdim];
-
-          Laplace_p   +=  - phi_x[i * dim + jdim] * solpGauss_x[jdim];
-
+        // Unknown local DOFs
+        for (unsigned u = 0; u < n_unknowns; u++) {
+            unknowns_local[u].set_elem_dofs(iel, msh, sol);
         }
 
-        double pi = acos(-1.);
+        // Prepare local mapping / storage
+        unk_element_jac_res.set_loc_to_glob_map(iel, msh, pdeSys);
+        const unsigned total_local_dofs = unk_element_jac_res.dof_map().size();
+        unk_element_jac_res.res().assign(total_local_dofs, (real_num)0.0);
+        unk_element_jac_res.jac().assign(total_local_dofs * total_local_dofs, (real_num)0.0);
 
+        // Cache of per-unknown number of local dofs
+        std::vector<unsigned> unk_num_elem_dofs(n_unknowns);
+        for (unsigned u = 0; u < n_unknowns; u++) {
+            unk_num_elem_dofs[u] = unknowns_local[u].num_elem_dofs();
+        }
 
-// // //         adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian(xGauss) * phi[i];
+        // Local lengths for each unknown
+        const unsigned nDofs_u = unk_num_elem_dofs[0];
+        const unsigned nDofs_v = unk_num_elem_dofs[1];
+        const unsigned nDofs_s1 = unk_num_elem_dofs[2];
+        const unsigned nDofs_s2 = unk_num_elem_dofs[3];
+        const unsigned nDofs_p = unk_num_elem_dofs[4];
 
-     adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
+        // Gauss loop
+        const unsigned nGauss = quad_rules[ielGeom].GetGaussPointsNumber();
+        for (unsigned ig = 0; ig < nGauss; ig++) {
 
-     adept::adouble F_term_d = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
+            // Jacobian (element geometry)
+            elem_all_for_domain[ielGeom][xType]->JacJacInv(geom_element.get_coords_at_dofs_3d(), ig, Jac_qp, JacI_qp, detJac_qp, space_dim);
+            weight_qp = detJac_qp * quad_rules[ielGeom].GetGaussWeightsPointer()[ig];
 
+            // Evaluate shape functions for each unknown at this gauss point
+            for (unsigned u = 0; u < n_unknowns; u++) {
+                elem_all[ielGeom][unknowns_local[u].fe_type()]->shape_funcs_current_elem(
+                    ig, JacI_qp,
+                    unknowns_phi_dof_qp[u].phi(),
+                    unknowns_phi_dof_qp[u].phi_grad(),
+                    unknowns_phi_dof_qp[u].phi_hess(),
+                    space_dim
+                );
+            }
 
+            // Geometry shape functions
+            elem_all_for_domain[ielGeom][xType]->shape_funcs_current_elem(
+                ig, JacI_qp,
+                geom_element_phi_dof_qp.phi(),
+                geom_element_phi_dof_qp.phi_grad(),
+                geom_element_phi_dof_qp.phi_hess(),
+                space_dim
+            );
 
-        // System residuals - signs adjusted to match matrix form
-     aResu[i] += ( Laplace_u + M_v) * weight;  // M*W + B^T*U = 0
-     aResv[i] += (Laplace_v + M_p ) * weight;  // B*W + ν1*C1*S1 + ν1*C2*S2 = -ν2*F
-     aRess1[i] += ( Laplace_s1 + M_s2) * weight;  // C1^T*W + M*S1 = 0
-     aRess2[i] += (M_u + Laplace_s2 - F_term_d ) * weight;  // C2^T*W + M*S2 = 0
-     aResp[i] += (  M_s1 + alpha  * M_p ) * weight;  // C2^T*W + M*S2 = 0
+            // Local references for shape functions
+            auto & phi_u = unknowns_phi_dof_qp[0].phi();
+            auto & gradphi_u = unknowns_phi_dof_qp[0].phi_grad();
+            auto & phi_v = unknowns_phi_dof_qp[1].phi();
+            auto & gradphi_v = unknowns_phi_dof_qp[1].phi_grad();
+            auto & phi_s1 = unknowns_phi_dof_qp[2].phi();
+            auto & gradphi_s1 = unknowns_phi_dof_qp[2].phi_grad();
+            auto & phi_s2 = unknowns_phi_dof_qp[3].phi();
+            auto & gradphi_s2 = unknowns_phi_dof_qp[3].phi_grad();
+            auto & phi_p = unknowns_phi_dof_qp[4].phi();
+            auto & gradphi_p = unknowns_phi_dof_qp[4].phi_grad();
 
-      } // end phi_i loop
+            // Interpolate solution values & gradients at gauss point for each unknown
+            real_num_mov u_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_u_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_u; ++a) {
+                u_val_g += (real_num_mov) phi_u[a] * (real_num_mov) unknowns_local[0].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_u_g[d] += (real_num_mov) gradphi_u[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[0].elem_dofs()[a];
+                }
+            }
 
-    } // end gauss point loop
+            real_num_mov v_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_v_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_v; ++a) {
+                v_val_g += (real_num_mov) phi_v[a] * (real_num_mov) unknowns_local[1].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_v_g[d] += (real_num_mov) gradphi_v[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[1].elem_dofs()[a];
+                }
+            }
 
-    // Add the local Matrix/Vector into the global Matrix/Vector
+            real_num_mov s1_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_s1_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_s1; ++a) {
+                s1_val_g += (real_num_mov) phi_s1[a] * (real_num_mov) unknowns_local[2].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_s1_g[d] += (real_num_mov) gradphi_s1[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[2].elem_dofs()[a];
+                }
+            }
 
-    //copy the value of the adept::adoube aRes in double Res and store
+            real_num_mov s2_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_s2_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_s2; ++a) {
+                s2_val_g += (real_num_mov) phi_s2[a] * (real_num_mov) unknowns_local[3].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_s2_g[d] += (real_num_mov) gradphi_s2[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[3].elem_dofs()[a];
+                }
+            }
 
-   Res.resize(5 * nDofs,0.0);
+            real_num_mov p_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_p_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_p; ++a) {
+                p_val_g += (real_num_mov) phi_p[a] * (real_num_mov) unknowns_local[4].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_p_g[d] += (real_num_mov) gradphi_p[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[4].elem_dofs()[a];
+                }
+            }
 
-    for (int i = 0; i < nDofs; i++) {
-      Res[i]         = -aResu[i].value();
-      Res[nDofs + i] = -aResv[i].value();
+            // Compute physical coordinates x_gss at gauss point
+            std::vector< real_num_mov > x_gss(dim, (real_num_mov)0.0);
+            auto & coords = geom_element.get_coords_at_dofs();
+            const unsigned nGeomDofs = coords[0].size();
+            for (unsigned a = 0; a < nGeomDofs; ++a) {
+                const real_num_mov geom_phi = (real_num_mov) geom_element_phi_dof_qp.phi()[a];
+                for (unsigned d = 0; d < dim; ++d) {
+                    x_gss[d] += (real_num_mov) coords[d][a] * geom_phi;
+                }
+            }
 
-      Res[2 * nDofs + i  ] = -aRess1[i].value(); // s1
-      Res[3 * nDofs + i  ] = -aRess2[i].value(); // s2
-      Res[4 * nDofs + i  ] = -aResp[i].value(); // s2
+            // Source f(x) at gauss point
+            const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss);
+            const double alpha = 0.01; // Regularization parameter
 
-    }
+            // ==================== RESIDUAL AND JACOBIAN CALCULATIONS ====================
 
-    RES->add_vector_blocked(Res, sysDof);
+            // Test functions for R_u (first equation): -Δu + v = 0
+            for (unsigned i = 0; i < nDofs_u; ++i) {
+                // R_u = ∫(∇u·∇v_u + v·v_u) dΩ
+                real_num_mov laplace_u = 0.0;
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    laplace_u += grad_u_g[d] * (real_num_mov) gradphi_u[i * dim_offset_grad + d];
+                }
 
-    Jac.resize(25 * nDofs * nDofs);
+                real_num_mov mass_v = v_val_g * (real_num_mov)phi_u[i];
 
-    // define the independent variables
-    s.independent(&solu[0], nDofs);
-    s.independent(&solv[0], nDofs);
+                unk_element_jac_res.res()[i] += (real_num)((laplace_u + mass_v) * weight_qp);
 
-    s.independent(&sols1[0], nDofs);
-    s.independent(&sols2[0], nDofs);
+                // Jacobian: ∂R_u/∂u_j and ∂R_u/∂v_j
+                for (unsigned j = 0; j < nDofs_u; ++j) {
+                    real_num_mov jac_uu = 0.0;
+                    for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                        jac_uu += (real_num_mov)gradphi_u[i * dim_offset_grad + d] * (real_num_mov)gradphi_u[j * dim_offset_grad + d];
+                    }
+                    unk_element_jac_res.jac()[i * total_local_dofs + j] += (real_num)(jac_uu * weight_qp);
+                }
 
-    s.independent(&solp[0], nDofs);
+                for (unsigned j = 0; j < nDofs_v; ++j) {
+                    real_num_mov jac_uv = (real_num_mov)phi_u[i] * (real_num_mov)phi_v[j];
+                    unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + j)] += (real_num)(jac_uv * weight_qp);
+                }
+            }
 
-        // define the dependent variables
-    s.dependent(&aResu[0], nDofs);
-    s.dependent(&aResv[0], nDofs);
-    s.dependent(&aRess1[0], nDofs);
-    s.dependent(&aRess2[0], nDofs);
-    s.dependent(&aResp[0], nDofs);
+            // Test functions for R_v (second equation): -Δv + p = 0
+            for (unsigned i = 0; i < nDofs_v; ++i) {
+                // R_v = ∫(∇v·∇v_v + p·v_v) dΩ
+                real_num_mov laplace_v = 0.0;
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    laplace_v += grad_v_g[d] * (real_num_mov) gradphi_v[i * dim_offset_grad + d];
+                }
 
-    // get the jacobian matrix (ordered by column)
-    s.jacobian(&Jac[0], true);
+                real_num_mov mass_p = p_val_g * (real_num_mov)phi_v[i];
 
-    KK->add_matrix_blocked(Jac, sysDof, sysDof);
+                unk_element_jac_res.res()[nDofs_u + i] += (real_num)((laplace_v + mass_p) * weight_qp);
 
-         constexpr bool print_algebra_local = false;
-     if (print_algebra_local) {
+                // Jacobian: ∂R_v/∂v_j and ∂R_v/∂p_j
+                for (unsigned j = 0; j < nDofs_v; ++j) {
+                    real_num_mov jac_vv = 0.0;
+                    for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                        jac_vv += (real_num_mov)gradphi_v[i * dim_offset_grad + d] * (real_num_mov)gradphi_v[j * dim_offset_grad + d];
+                    }
+                    unk_element_jac_res.jac()[(nDofs_u + i) * total_local_dofs + (nDofs_u + j)] += (real_num)(jac_vv * weight_qp);
+                }
 
-         assemble_jacobian<double,double>::print_element_jacobian(iel, Jac, Sol_n_el_dofs_Mat_vol, 10, 5);
-         assemble_jacobian<double,double>::print_element_residual(iel, Res, Sol_n_el_dofs_Mat_vol, 10, 5);
+                for (unsigned j = 0; j < nDofs_p; ++j) {
+                    real_num_mov jac_vp = (real_num_mov)phi_v[i] * (real_num_mov)phi_p[j];
+                    unk_element_jac_res.jac()[(nDofs_u + i) * total_local_dofs + (nDofs_u + nDofs_v + nDofs_s1 + nDofs_s2 + j)] += (real_num)(jac_vp * weight_qp);
+                }
+            }
 
-     }
+            // Test functions for R_s1 (third equation): -Δs1 + s2 = 0
+            for (unsigned i = 0; i < nDofs_s1; ++i) {
+                // R_s1 = ∫(∇s1·∇v_s1 + s2·v_s1) dΩ
+                real_num_mov laplace_s1 = 0.0;
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    laplace_s1 += grad_s1_g[d] * (real_num_mov) gradphi_s1[i * dim_offset_grad + d];
+                }
 
+                real_num_mov mass_s2 = s2_val_g * (real_num_mov)phi_s1[i];
 
-    s.clear_independents();
-    s.clear_dependents();
+                unk_element_jac_res.res()[nDofs_u + nDofs_v + i] += (real_num)((laplace_s1 + mass_s2) * weight_qp);
 
-  } //end element loop for each process
+                // Jacobian: ∂R_s1/∂s1_j and ∂R_s1/∂s2_j
+                for (unsigned j = 0; j < nDofs_s1; ++j) {
+                    real_num_mov jac_s1s1 = 0.0;
+                    for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                        jac_s1s1 += (real_num_mov)gradphi_s1[i * dim_offset_grad + d] * (real_num_mov)gradphi_s1[j * dim_offset_grad + d];
+                    }
+                    unk_element_jac_res.jac()[(nDofs_u + nDofs_v + i) * total_local_dofs + (nDofs_u + nDofs_v + j)] += (real_num)(jac_s1s1 * weight_qp);
+                }
 
-  RES->close();
-  KK->close();
+                for (unsigned j = 0; j < nDofs_s2; ++j) {
+                    real_num_mov jac_s1s2 = (real_num_mov)phi_s1[i] * (real_num_mov)phi_s2[j];
+                    unk_element_jac_res.jac()[(nDofs_u + nDofs_v + i) * total_local_dofs + (nDofs_u + nDofs_v + nDofs_s1 + j)] += (real_num)(jac_s1s2 * weight_qp);
+                }
+            }
+
+            // Test functions for R_s2 (fourth equation): u - Δs2 - f = 0
+            for (unsigned i = 0; i < nDofs_s2; ++i) {
+                // R_s2 = ∫(u·v_s2 + ∇s2·∇v_s2 - f·v_s2) dΩ
+                real_num_mov mass_u = u_val_g * (real_num_mov)phi_s2[i];
+
+                real_num_mov laplace_s2 = 0.0;
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    laplace_s2 += grad_s2_g[d] * (real_num_mov) gradphi_s2[i * dim_offset_grad + d];
+                }
+
+                real_num_mov source_term = f_val * (real_num_mov)phi_s2[i];
+
+                unk_element_jac_res.res()[nDofs_u + nDofs_v + nDofs_s1 + i] +=
+                    (real_num)((mass_u + laplace_s2 - source_term) * weight_qp);
+
+                // Jacobian: ∂R_s2/∂u_j, ∂R_s2/∂s2_j
+                for (unsigned j = 0; j < nDofs_u; ++j) {
+                    real_num_mov jac_s2u = (real_num_mov)phi_s2[i] * (real_num_mov)phi_u[j];
+                    unk_element_jac_res.jac()[(nDofs_u + nDofs_v + nDofs_s1 + i) * total_local_dofs + j] += (real_num)(jac_s2u * weight_qp);
+                }
+
+                for (unsigned j = 0; j < nDofs_s2; ++j) {
+                    real_num_mov jac_s2s2 = 0.0;
+                    for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                        jac_s2s2 += (real_num_mov)gradphi_s2[i * dim_offset_grad + d] * (real_num_mov)gradphi_s2[j * dim_offset_grad + d];
+                    }
+                    unk_element_jac_res.jac()[(nDofs_u + nDofs_v + nDofs_s1 + i) * total_local_dofs + (nDofs_u + nDofs_v + nDofs_s1 + j)] += (real_num)(jac_s2s2 * weight_qp);
+                }
+            }
+
+            // Test functions for R_p (fifth equation): s1 + α·p = 0
+            for (unsigned i = 0; i < nDofs_p; ++i) {
+                // R_p = ∫(s1·v_p + α·p·v_p) dΩ
+                real_num_mov mass_s1 = s1_val_g * (real_num_mov)phi_p[i];
+                real_num_mov mass_p = alpha * p_val_g * (real_num_mov)phi_p[i];
+
+                unk_element_jac_res.res()[nDofs_u + nDofs_v + nDofs_s1 + nDofs_s2 + i] +=
+                    (real_num)((mass_s1 + mass_p) * weight_qp);
+
+                // Jacobian: ∂R_p/∂s1_j and ∂R_p/∂p_j
+                for (unsigned j = 0; j < nDofs_s1; ++j) {
+                    real_num_mov jac_ps1 = (real_num_mov)phi_p[i] * (real_num_mov)phi_s1[j];
+                    unk_element_jac_res.jac()[(nDofs_u + nDofs_v + nDofs_s1 + nDofs_s2 + i) * total_local_dofs + (nDofs_u + nDofs_v + j)] += (real_num)(jac_ps1 * weight_qp);
+                }
+
+                for (unsigned j = 0; j < nDofs_p; ++j) {
+                    real_num_mov jac_pp = alpha * (real_num_mov)phi_p[i] * (real_num_mov)phi_p[j];
+                    unk_element_jac_res.jac()[(nDofs_u + nDofs_v + nDofs_s1 + nDofs_s2 + i) * total_local_dofs + (nDofs_u + nDofs_v + nDofs_s1 + nDofs_s2 + j)] += (real_num)(jac_pp * weight_qp);
+                }
+            }
+
+        } // end gauss loop
+
+        // Finalize local residual (FEMUS convention negative)
+        std::vector<double> Res_total(unk_element_jac_res.res().size());
+        for (size_t kk = 0; kk < unk_element_jac_res.res().size(); ++kk) {
+            Res_total[kk] = -(unk_element_jac_res.res()[kk]);
+        }
+
+        RES->add_vector_blocked(Res_total, unk_element_jac_res.dof_map());
+
+        if (assembleMatrix) {
+            KK->add_matrix_blocked(unk_element_jac_res.jac(), unk_element_jac_res.dof_map(), unk_element_jac_res.dof_map());
+        }
+
+        // Optional printing
+        constexpr bool print_algebra_local = true;
+        if (print_algebra_local) {
+            std::vector<unsigned> Sol_n_el_dofs_Mat_vol = {nDofs_u, nDofs_v, nDofs_s1, nDofs_s2, nDofs_p};
+            assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 10, 5);
+            assemble_jacobian<double,double>::print_element_residual(iel, Res_total, Sol_n_el_dofs_Mat_vol, 10, 5);
+        }
+
+    } // end element loop
+
+    RES->close();
+    if (assembleMatrix) KK->close();
 
 
 }
