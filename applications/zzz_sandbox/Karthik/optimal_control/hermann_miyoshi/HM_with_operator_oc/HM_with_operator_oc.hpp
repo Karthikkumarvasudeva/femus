@@ -1243,43 +1243,18 @@ double nu =  0.3 /* Poisson ratio value */;
         adept::adouble Laplace_q = 0.;
 
 
-// // //         adept::adouble M_u = phi[i] * soluGauss ;
-// // //
-// // //         adept::adouble M_sxx = nu * phi[i] * solsxxGauss + (1. - nu) * phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
-// // //
-// // //         adept::adouble M_sxy = 2. * (1. - nu) * phi[i] * solsxyGauss;
-// // //
-// // //         adept::adouble M_syy = nu * phi[i] * solsyyGauss + (1. - nu) * phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
-// // //
-// // //         adept::adouble M_ud = phi[i] * soludGauss;
-// // //
-// // //         adept::adouble M_sxxd =  nu * phi[i] * solsxxdGauss + (1. - nu) * phi[i] * solsxxdGauss + nu * phi[i] * solsxxdGauss;
-// // //
-// // //         adept::adouble M_sxyd = 2. * (1. - nu) * phi[i] * solsxydGauss;
-// // //
-// // //         adept::adouble M_syyd = nu * phi[i] * solsyydGauss + (1. - nu) * phi[i] * solsyydGauss + nu * phi[i] * solsyydGauss;
-// // //
-// // //         adept::adouble M_q = phi[i] * solqGauss;
+        adept::adouble M_u = phi[i] * soluGauss;
 
-
-
-        adept::adouble M_u = phi[i] * soluGauss ;
-
-        adept::adouble M_sxx = phi[i] * solsxxGauss;
-
-        adept::adouble M_sxy = 2. * phi[i] * solsxyGauss;
-
-        adept::adouble M_syy = phi[i] * solsyyGauss;
-
+        adept::adouble M_sxx = phi[i] * solsxxGauss + nu * phi[i] * solsxxGauss;
+        adept::adouble M_sxy =  2.* (1. - nu) * phi[i] * solsxyGauss;
+        adept::adouble M_syy = phi[i] * solsyyGauss + nu * phi[i] * solsyyGauss;
         adept::adouble M_ud = phi[i] * soludGauss;
-
-        adept::adouble M_sxxd = phi[i] * solsxxdGauss;
-
-        adept::adouble M_sxyd = 2. * phi[i] * solsxydGauss;
-
-        adept::adouble M_syyd = phi[i] * solsyydGauss;
+        adept::adouble M_sxxd = phi[i] * solsxxdGauss + nu * phi[i] * solsxxdGauss;
+        adept::adouble M_sxyd =  2.* (1. - nu) * phi[i] * solsxydGauss;
+        adept::adouble M_syyd = phi[i] * solsyydGauss + nu * phi[i] * solsyydGauss;
 
         adept::adouble M_q = phi[i] * solqGauss;
+
 
 
 
@@ -1318,60 +1293,29 @@ double nu =  0.3 /* Poisson ratio value */;
 
        if (dim == 2) {
 
-// // //         Bxxu += nu * ( phi_x[i * dim] * soluGauss_x[0] +  phi_x[i * dim + 1] * soluGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soluGauss_x[0];
-// // //
-// // //         Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
-// // //
-// // //         Byyu +=  nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
-// // //
-// // //
-// // //         Bxx += nu * ( phi_x[i * dim] * solsxxGauss_x[0] +  phi_x[i * dim + 1] * solsxxGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxGauss_x[0];
-// // //
-// // //         Bxy += ( 1. - nu ) * ( phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1 ] * solsxyGauss_x[0] );
-// // //
-// // //         Byy +=  nu * ( phi_x[i * dim ] * solsyyGauss_x[0] + phi_x[i * dim +1] * solsyyGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyyGauss_x[1];
-// // //
-// // //
-// // //
-// // //         Bxxud +=  nu * ( phi_x[i * dim] * soludGauss_x[0] +  phi_x[i * dim + 1] * soludGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * soludGauss_x[0];
-// // //
-// // //         Bxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
-// // //
-// // //         Byyud +=  nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
-// // //
-// // //         Bxxd += nu * ( phi_x[i * dim] * solsxxdGauss_x[0] +  phi_x[i * dim + 1] * solsxxdGauss_x[1] ) + (1. - nu) * phi_x[i * dim] * solsxxdGauss_x[0];
-// // //
-// // //         Bxyd +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1 ] * solsxydGauss_x[0] );
-// // //
-// // //         Byyd +=   nu * ( phi_x[i * dim ] * solsyydGauss_x[0] + phi_x[i * dim +1] * solsyydGauss_x[1] ) + (1. - nu ) * phi_x[i * dim + 1] * solsyydGauss_x[1];
+        Bxxu += phi_x[i * dim] * soluGauss_x[0] + nu * phi_x[i * dim + 1] * soluGauss_x[1];
 
+        Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
 
-        Bxxu +=  phi_x[i * dim] * soluGauss_x[0];
-
-        Bxyu += phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0];
-
-        Byyu += phi_x[i * dim + 1] * soluGauss_x[1];
-
+        Byyu += nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
 
         Bxx += phi_x[i * dim] * solsxxGauss_x[0];
 
-        Bxy += phi_x[i * dim] * solsxyGauss_x[1] + phi_x[i * dim + 1 ] * solsxyGauss_x[0];
+        Bxy +=( (phi_x[i * dim + 1 ] * solsxyGauss_x[0] + phi_x[i * dim ] * solsxyGauss_x[1]) );
+        Byy +=  phi_x[i * dim + 1] * solsyyGauss_x[1];
 
-        Byy +=  phi_x[i * dim +1] * solsyyGauss_x[1] ;
+        Bxxud += phi_x[i * dim] * soludGauss_x[0] + nu * phi_x[i * dim + 1] * soludGauss_x[1];
 
+        Bxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
 
+        Byyud += nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
 
-        Bxxud +=  phi_x[i * dim] * soludGauss_x[0] ;
+        Bxxd += phi_x[i * dim] * solsxxdGauss_x[0] + nu * phi_x[i * dim + 1] * solsxxdGauss_x[1];
 
-        Bxyud +=  phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] ;
+        Bxyd +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1] * solsxydGauss_x[0] );
 
-        Byyud +=  phi_x[i * dim + 1] * soludGauss_x[1];
+        Byyd +=  nu * phi_x[i * dim] * solsyydGauss_x[0] + phi_x[i * dim + 1] * solsyydGauss_x[1];
 
-        Bxxd +=  phi_x[i * dim] * solsxxdGauss_x[0];
-
-        Bxyd += ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1 ] * solsxydGauss_x[0] );
-
-        Byyd +=  phi_x[i * dim +1] * solsyydGauss_x[1];
 
 
 

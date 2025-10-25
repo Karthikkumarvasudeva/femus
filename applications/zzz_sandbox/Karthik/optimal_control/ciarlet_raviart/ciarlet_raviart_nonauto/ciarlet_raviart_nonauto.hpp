@@ -925,7 +925,7 @@ static void AssembleBilaplaceProblem_AD(
     if (assembleMatrix) KK->zero();
 
     // Keep same conventions as your code
-    constexpr unsigned int space_dim = 3; // max spatial dimension
+    constexpr unsigned int space_dim = 2; // max spatial dimension
     const unsigned int dim_offset_grad = dim;
 
     // Jacobian geometry containers
@@ -1089,7 +1089,7 @@ static void AssembleBilaplaceProblem_AD(
 
             // Source f(x) at gauss point
             const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss);
-            const double alpha = 0.01; // Regularization parameter
+            const double alpha = 0.00000001; // Regularization parameter
 
             // ==================== RESIDUAL AND JACOBIAN CALCULATIONS ====================
 
@@ -1240,7 +1240,7 @@ static void AssembleBilaplaceProblem_AD(
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = true;
+        constexpr bool print_algebra_local = false;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = {nDofs_u, nDofs_v, nDofs_s1, nDofs_s2, nDofs_p};
             assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 10, 5);

@@ -41,7 +41,7 @@ using namespace femus;
 namespace Domains {
 namespace square_m05p05 {
 
-        static constexpr double alpha = 0.01;
+        static constexpr double alpha = 0.00000001;
 
 
 template <class type = double>
@@ -192,7 +192,7 @@ private:
 };
 
 
-
+/*
 template <class type = double>
 class Function_Zero_on_boundary_7_u_star : public Math::Function<type> {
 
@@ -217,6 +217,38 @@ public:
     type laplacian(const std::vector<type>& x) const {
         return -alpha * 32768.0 * pow(pi,10) * sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1])              - 8.0 * pi * pi * sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
 //         return 0.;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+//     static constexpr double alpha = 0.000001;
+};
+*/
+
+template <class type = double>
+class Function_Zero_on_boundary_7_u_star : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+//         return alpha *4096. * pi * pi * pi * pi * pi * pi * pi * pi * sin(2. * pi * x[0])* sin(2. * pi * x[1]) + sin(2. * pi * x[0])* sin(2. * pi * x[1]);
+                return 1.0;
+
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+//         solGrad[0] = alpha * 8192.0 * pow(pi,9) * cos(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]) + 2.0 * pi * cos(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
+//         solGrad[1] = alpha * 8192.0 * pow(pi,9) * sin(2.0 * pi * x[0]) * cos(2.0 * pi * x[1]) + 2.0 * pi * sin(2.0 * pi * x[0]) * cos(2.0 * pi * x[1]);
+//         return solGrad;
+       solGrad[0] = 0.;
+       solGrad[1] = 0.;
+                return solGrad;
+
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+//         return -alpha * 32768.0 * pow(pi,10) * sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1])              - 8.0 * pi * pi * sin(2.0 * pi * x[0]) * sin(2.0 * pi * x[1]);
+        return 0.;
     }
 
 private:
@@ -447,7 +479,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 5;
+    unsigned max_number_of_meshes = 8;
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
