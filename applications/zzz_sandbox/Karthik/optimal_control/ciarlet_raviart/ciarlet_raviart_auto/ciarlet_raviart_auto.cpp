@@ -347,11 +347,9 @@ system_biharmonic_HM._assemble_function_for_rhs = &system_biharmonic_HM_function
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-<<<<<<< HEAD:applications/zzz_sandbox/Karthik/optimal_control/ciarlet_raviart/ciarlet_raviart.cpp
-  unsigned maxNumberOfMeshes = 5;
-=======
-  unsigned maxNumberOfMeshes = 6;
->>>>>>> origin/master:applications/zzz_sandbox/Karthik/optimal_control/ciarlet_raviart/ciarlet_raviart_auto/ciarlet_raviart_auto.cpp
+
+  unsigned maxNumberOfMeshes = 3;
+
 
   // // // std::vector < std::vector < double > > l2Norm;
   // // // l2Norm.resize(maxNumberOfMeshes);

@@ -552,7 +552,7 @@ static void AssembleBilaplaceProblem(
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = false;
+        constexpr bool print_algebra_local = true;
         if (print_algebra_local) {
             const unsigned nDofs_u_local = unk_num_elem_dofs[0];
             const unsigned nDofs_sxx_local = unk_num_elem_dofs[1];
