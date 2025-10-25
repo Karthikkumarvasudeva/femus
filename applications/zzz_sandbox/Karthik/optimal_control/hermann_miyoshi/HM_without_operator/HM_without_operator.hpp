@@ -1391,7 +1391,7 @@ double alpha = .001 ;
 
     KK->add_matrix_blocked(Jac, sysDof, sysDof);
 
-         constexpr bool print_algebra_local = false;
+         constexpr bool print_algebra_local = true;
      if (print_algebra_local) {
 
          assemble_jacobian<double,double>::print_element_jacobian(iel, Jac, Sol_n_el_dofs_Mat_vol, 10, 5);
