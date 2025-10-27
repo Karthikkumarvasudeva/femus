@@ -48,6 +48,7 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
+    static constexpr double a = 0.0000000001;
 
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
@@ -189,7 +190,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+//     static constexpr double a = 0.001;
 };
 
 
@@ -217,7 +218,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+//     static constexpr double a = 0.001;
 };
 
 
@@ -243,7 +244,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+//     static constexpr double a = 0.001;
 };
 
 
@@ -294,7 +295,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+//     static constexpr double a = 0.001;
 };
 
 /*
@@ -333,27 +334,23 @@ class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> 
 
 public:
     type value(const std::vector<type>& x) const {
-        type base = sin(2*pi*x[0])*sin(2*pi*x[1]);
         return 1.; // 4096π⁸ = (8π²)⁴
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        type factor = (1. - a * 4096.*pow(pi, 8));
         solGrad[0] = 0.;
         solGrad[1] = 0.;
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        type factor = (1. - a * 4096.*pow(pi, 8));
-        type base = sin(2.*pi*x[0]) * sin(2.*pi*x[1]);
         return 0.;
     }
 
 private:
     static constexpr double pi = acos(-1.);
-    static constexpr double a = 0.001;
+//     static constexpr double a = 0.001;
 
 };
 
@@ -577,7 +574,7 @@ const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_sin
         system.set_unknown_list_for_assembly(unknowns);
 
         // Attach the custom stress-based assembly function
-        system.SetAssembleFunction(System_assemble_interface_StressBased< NonLinearImplicitSystem, real_num, double >);
+        system.SetAssembleFunction(System_assemble_interface_StressBased< LinearImplicitSystem, real_num, double >);
 
         // Set the current system number
         ml_prob.set_current_system_number(0);
@@ -640,7 +637,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 6;
+    unsigned max_number_of_meshes = 8;
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
@@ -682,7 +679,7 @@ int main(int argc, char** args) {
     // ======= System Specifics for Stress-Based Problem - BEGIN ==================
     system_specifics app_specs;
     app_specs._system_name = "StressBasedOptimalControl";
-    app_specs._assemble_function = System_assemble_interface_StressBased<NonLinearImplicitSystem, double, double>;
+    app_specs._assemble_function = System_assemble_interface_StressBased<LinearImplicitSystem, double, double>;
     app_specs._assemble_function_for_rhs = &source_function;
     app_specs._true_solution_function = &analytical_u_solution;
     app_specs._boundary_conditions_types_and_values = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
@@ -690,7 +687,7 @@ int main(int argc, char** args) {
     // ======= System Specifics for Stress-Based Problem - END ==================
 
     // Various choices for convergence study
-    std::vector < bool > convergence_rate_computation_method_Flag = {true, false};
+    std::vector < bool > convergence_rate_computation_method_Flag = {true, true};
     std::vector < bool > volume_or_boundary_Flag = {true, true};
     std::vector < bool > sobolev_norms_Flag = {true, true};
 
