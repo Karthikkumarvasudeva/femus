@@ -48,7 +48,7 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-      static constexpr double a = 0.00000001;
+      static constexpr double a = 0.001;
 
 /*
 template <class type = double>
@@ -368,7 +368,7 @@ class Function_Zero_on_boundary_7 : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
-        return cos(pi * x[0]) * cos(pi * x[1]);
+        return 2. * cos(pi * x[0]) * cos(pi * x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
@@ -482,7 +482,7 @@ private:
 };
 
 template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_q : public Math::Function<type> {
+class Function_Zero_on_boundary_7_deviatoric_w : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
@@ -693,9 +693,21 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem *
       Math::Function <double> * syyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
     Value = syyd -> value(x);
   }
-    else if (!strcmp(SolName, "q")) {
-      Math::Function <double> * q = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = q -> value(x);
+    else if (!strcmp(SolName, "w")) {
+      Math::Function <double> * w = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = w -> value(x);
+  }
+    else if (!strcmp(SolName, "wsxxd")) {
+      Math::Function <double> * wsxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = wsxxd -> value(x);
+  }
+    else if (!strcmp(SolName, "wsxyd")) {
+      Math::Function <double> * wsxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = wsxyd -> value(x);
+  }
+    else if (!strcmp(SolName, "wsyyd")) {
+      Math::Function <double> * wsyyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = wsyyd -> value(x);
   }
   return dirichlet;
 }
@@ -754,7 +766,13 @@ int main(int argc, char** args) {
 
   Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr <>   system_biharmonic_HM_function_zero_on_boundary_u_dr;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_q <>   system_biharmonic_HM_function_zero_on_boundary_q;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w <>   system_biharmonic_HM_function_zero_on_boundary_w;
+
+    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd  <>   system_biharmonic_HM_function_zero_on_boundary_wsxxd;
+
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd  <>   system_biharmonic_HM_function_zero_on_boundary_wsxyd;
+
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd <>   system_biharmonic_HM_function_zero_on_boundary_wsyyd;
 
   Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian  <>   system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
 
@@ -783,7 +801,7 @@ int main(int argc, char** args) {
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 6;
+  unsigned maxNumberOfMeshes = 4;
 
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
 
@@ -797,8 +815,10 @@ int main(int argc, char** args) {
   std::vector<std::vector<double>> l2Norm_sxyd(maxNumberOfMeshes), semiNorm_sxyd(maxNumberOfMeshes);
   std::vector<std::vector<double>> l2Norm_syyd(maxNumberOfMeshes), semiNorm_syyd(maxNumberOfMeshes);
 
-  std::vector<std::vector<double>> l2Norm_q(maxNumberOfMeshes), semiNorm_q(maxNumberOfMeshes);
-
+  std::vector<std::vector<double>> l2Norm_w(maxNumberOfMeshes), semiNorm_w(maxNumberOfMeshes);
+  std::vector<std::vector<double>> l2Norm_wsxxd(maxNumberOfMeshes), semiNorm_wsxxd(maxNumberOfMeshes);
+  std::vector<std::vector<double>> l2Norm_wsxyd(maxNumberOfMeshes), semiNorm_wsxyd(maxNumberOfMeshes);
+  std::vector<std::vector<double>> l2Norm_wsyyd(maxNumberOfMeshes), semiNorm_wsyyd(maxNumberOfMeshes);
 
 
   for (unsigned i = 0; i < maxNumberOfMeshes; i++) {
@@ -817,8 +837,10 @@ int main(int argc, char** args) {
     l2Norm_sxyd[i].resize(feOrder.size());semiNorm_sxyd[i].resize(feOrder.size());
     l2Norm_syyd[i].resize(feOrder.size());semiNorm_syyd[i].resize(feOrder.size());
 
-    l2Norm_q[i].resize(feOrder.size());   semiNorm_q[i].resize(feOrder.size());
-
+    l2Norm_w[i].resize(feOrder.size());   semiNorm_w[i].resize(feOrder.size());
+    l2Norm_wsxxd[i].resize(feOrder.size());semiNorm_wsxxd[i].resize(feOrder.size());
+    l2Norm_wsxyd[i].resize(feOrder.size());semiNorm_wsxyd[i].resize(feOrder.size());
+    l2Norm_wsyyd[i].resize(feOrder.size());semiNorm_wsyyd[i].resize(feOrder.size());
 
     for (unsigned j = 0; j < feOrder.size(); j++) {
       MultiLevelSolution mlSol(&mlMsh);
@@ -847,9 +869,17 @@ int main(int argc, char** args) {
       mlSol.AddSolution("syyd", LAGRANGE, feOrder[j]);
       mlSol.set_analytical_function("syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
 
-      mlSol.AddSolution("q", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("q", &system_biharmonic_HM_function_zero_on_boundary_q);
+      mlSol.AddSolution("w", LAGRANGE, feOrder[j]);
+      mlSol.set_analytical_function("w", &system_biharmonic_HM_function_zero_on_boundary_w);
 
+      mlSol.AddSolution("wsxxd", LAGRANGE, feOrder[j]);
+      mlSol.set_analytical_function("wsxxd", &system_biharmonic_HM_function_zero_on_boundary_wsxxd);
+
+      mlSol.AddSolution("wsxyd", LAGRANGE, feOrder[j]);
+      mlSol.set_analytical_function("wsxyd", &system_biharmonic_HM_function_zero_on_boundary_wsxyd);
+
+      mlSol.AddSolution("wsyyd", LAGRANGE, feOrder[j]);
+      mlSol.set_analytical_function("wsyyd", &system_biharmonic_HM_function_zero_on_boundary_wsyyd);
 
       mlSol.Initialize("All");
 
@@ -869,7 +899,10 @@ int main(int argc, char** args) {
       mlSol.GenerateBdc("syyd", "Steady", &ml_prob);
 
 
-      mlSol.GenerateBdc("q", "Steady", &ml_prob);
+      mlSol.GenerateBdc("w", "Steady", &ml_prob);
+      mlSol.GenerateBdc("wsxxd", "Steady", &ml_prob);
+      mlSol.GenerateBdc("wsxyd", "Steady", &ml_prob);
+      mlSol.GenerateBdc("wsyyd", "Steady", &ml_prob);
 
       LinearImplicitSystem& system = ml_prob.add_system<LinearImplicitSystem>(system_biharmonic_HM._system_name);
       system.AddSolutionToSystemPDE("u");
@@ -877,18 +910,20 @@ int main(int argc, char** args) {
       system.AddSolutionToSystemPDE("sxy");
       system.AddSolutionToSystemPDE("syy");
 
-            system.AddSolutionToSystemPDE("ud");
+      system.AddSolutionToSystemPDE("ud");
       system.AddSolutionToSystemPDE("sxxd");
       system.AddSolutionToSystemPDE("sxyd");
       system.AddSolutionToSystemPDE("syyd");
 
-      system.AddSolutionToSystemPDE("q");
-
+      system.AddSolutionToSystemPDE("w");
+      system.AddSolutionToSystemPDE("wsxxd");
+      system.AddSolutionToSystemPDE("wsxyd");
+      system.AddSolutionToSystemPDE("wsyyd");
 
       system.SetAssembleFunction(system_biharmonic_HM._assemble_function);
 
       system.init();
-            system.SetOuterSolver(PREONLY);
+      system.SetOuterSolver(PREONLY);
 
       system.MGsolve();
 
@@ -926,9 +961,22 @@ int main(int argc, char** args) {
       l2Norm_syyd[i][j] = norm.first;
       semiNorm_syyd[i][j] = norm.second;
 
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "q", &system_biharmonic_HM_function_zero_on_boundary_q);
-      l2Norm_q[i][j] = norm.first;
-      semiNorm_q[i][j] = norm.second;
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "w", &system_biharmonic_HM_function_zero_on_boundary_w);
+      l2Norm_w[i][j] = norm.first;
+      semiNorm_w[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsxxd", &system_biharmonic_HM_function_zero_on_boundary_wsxxd);
+      l2Norm_wsxxd[i][j] = norm.first;
+      semiNorm_wsxxd[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsxyd", &system_biharmonic_HM_function_zero_on_boundary_wsxyd);
+      l2Norm_wsxyd[i][j] = norm.first;
+      semiNorm_wsxyd[i][j] = norm.second;
+
+      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsyyd", &system_biharmonic_HM_function_zero_on_boundary_wsyyd);
+      l2Norm_wsyyd[i][j] = norm.first;
+      semiNorm_wsyyd[i][j] = norm.second;
+
 
       VTKWriter vtkIO(&mlSol);
       vtkIO.Write("test", Files::_application_output_directory, "biquadratic", {"All"}, i);
@@ -972,8 +1020,14 @@ int main(int argc, char** args) {
   print_error(l2Norm_syyd, "L2 ERROR for syyd");
   print_error(semiNorm_syyd, "H1 ERROR for syyd");
 
-  print_error(l2Norm_q, "L2 ERROR for q");
-  print_error(semiNorm_q, "H1 ERROR for q");
+  print_error(l2Norm_w, "L2 ERROR for w");
+  print_error(semiNorm_w, "H1 ERROR for w");
+  print_error(l2Norm_wsxxd, "L2 ERROR for wsxxd");
+  print_error(semiNorm_wsxxd, "H1 ERROR for wsxxd");
+  print_error(l2Norm_wsxyd, "L2 ERROR for wsxyd");
+  print_error(semiNorm_wsxyd, "H1 ERROR for wsxyd");
+  print_error(l2Norm_wsyyd, "L2 ERROR for wsyyd");
+  print_error(semiNorm_wsyyd, "H1 ERROR for wsyyd");
 
   return 0;
 }
