@@ -1099,7 +1099,7 @@ double nu =  0. /* Poisson ratio value */;
 
     unsigned nDofs2 = msh->GetElementDofNumber(iel, xType);    // number of coordinate element dofs
 
-    std::vector<unsigned> Sol_n_el_dofs_Mat_vol(9, nDofs);
+    std::vector<unsigned> Sol_n_el_dofs_Mat_vol(12, nDofs);
 
     // resize local arrays
     sysDof.resize(12 * nDofs);
