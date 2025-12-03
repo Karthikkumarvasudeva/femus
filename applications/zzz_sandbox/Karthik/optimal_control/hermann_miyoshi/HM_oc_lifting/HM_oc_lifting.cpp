@@ -368,7 +368,7 @@ class Function_Zero_on_boundary_7 : public Math::Function<type> {
 
 public:
     type value(const std::vector<type>& x) const {
-        return 2. * cos(pi * x[0]) * cos(pi * x[1]);
+        return  cos(pi * x[0]) * cos(pi * x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
