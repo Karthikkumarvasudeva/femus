@@ -15,4 +15,4 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
 
   ADD_SUBDIRECTORY(./HM_oc_lifting/)
 
-
+  ADD_SUBDIRECTORY(./HM_oc_lifting_nonauto/)

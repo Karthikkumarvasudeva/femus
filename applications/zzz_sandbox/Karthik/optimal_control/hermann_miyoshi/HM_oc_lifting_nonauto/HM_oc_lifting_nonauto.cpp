@@ -37,7 +37,7 @@
    #include "01_biharmonic_coupled.hpp"
    #define NAMESPACE_FOR_BIHARMONIC   femus
 #elif LIBRARY_OR_USER == 1
-   #include "HM_oc_lifting.hpp"
+   #include "HM_oc_lifting_nonauto.hpp"
    #define NAMESPACE_FOR_BIHARMONIC_HM   karthik
 #endif
 
@@ -766,7 +766,7 @@ int main(int argc, char** args) {
 
 
   system_biharmonic_HM._system_name = "Biharmonic";
-  system_biharmonic_HM._assemble_function = NAMESPACE_FOR_BIHARMONIC_HM :: biharmonic_HM_oc_lifting :: AssembleBilaplaceProblem_AD;
+  system_biharmonic_HM._assemble_function = NAMESPACE_FOR_BIHARMONIC_HM :: biharmonic_HM_oc_lifting_nonauto :: AssembleBilaplaceProblem_AD;
 
   system_biharmonic_HM._boundary_conditions_types_and_values             = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
 
