@@ -12,6 +12,8 @@
 #include "NumericVector.hpp"
 #include "SparseMatrix.hpp"
 #include "Assemble_jacobian.hpp"
+#include "Assemble_unknown_jacres.hpp" // <-- ADD THIS LINE to fix ElementJacRes errors
+#include "CurrentElem.hpp"
 /**
  * Given the non linear problem
  *
@@ -38,9 +40,9 @@ using namespace femus;
 
 
 namespace karthik {
-  
+
   class biharmonic_HM_oc_lifting_nonauto {
-    
+
   public:
 
 
@@ -895,647 +897,807 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
 // // // //========= BOUNDARY_IMPLEMENTATION_S2 - END ==================
 
 
-static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
-  //  ml_prob is the global object from/to where get/set all the data
-  //  level is the level of the PDE system to be assembled
+template < class system_type, class real_num, class real_num_mov >
+static void AssembleBilaplaceProblem_AD(
+     const std::vector < std::vector < elem_type_templ_base<real_num, real_num_mov> * > > & elem_all,
+     const std::vector < std::vector < elem_type_templ_base<real_num_mov, real_num_mov> * > > & elem_all_for_domain,
+     const std::vector<Gauss> & quad_rules,
+     system_type * mlPdeSys,
+     MultiLevelMesh * ml_mesh_in,
+     MultiLevelSolution * ml_sol_in,
+     const std::vector< Unknown > &  unknowns,
+     const std::vector< Math::Function< double > * > & source_functions) {
 
-  // call the adept stack object
-  adept::Stack& s = FemusInit::_adeptStack;
+    // level is the level of the PDE system to be assembled
+    const unsigned level = mlPdeSys->GetLevelToAssemble();
+    const bool assembleMatrix = mlPdeSys->GetAssembleMatrix();
 
-  //  extract pointers to the several objects that we are going to use
+    Mesh* msh = ml_mesh_in->GetLevel(level);
+    MultiLevelSolution* ml_sol = ml_sol_in;
+    Solution* sol = ml_sol->GetSolutionLevel(level);
 
-  LinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<LinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
+    LinearEquationSolver* pdeSys = mlPdeSys->_LinSolver[level];
+    SparseMatrix* KK = pdeSys->_KK;
+    NumericVector* RES = pdeSys->_RES;
 
+    const unsigned dim = msh->GetDimension();
+    const unsigned iproc = msh->processor_id();
 
-//   LinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<NonLinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
+    RES->zero();
+    if (assembleMatrix) KK->zero();
 
+    // Physics Constants
+    const double beta = 0.01;
+    const double gamma = 0.01;
+    // const double nu = 0.0; // Poisson ratio unused in provided AD code
 
-  const unsigned level = mlPdeSys->GetLevelToAssemble();
+    constexpr unsigned int space_dim = 2; // max spatial dimension
+    const unsigned int dim_offset_grad = dim;
 
-  Mesh*          msh          = ml_prob._ml_msh->GetLevel(level);    // pointer to the mesh (level) object
-  elem*          el         = msh->GetMeshElements();  // pointer to the elem object in msh (level)
+    // Jacobian geometry containers
+    std::vector< std::vector< real_num_mov > > JacI_qp(space_dim);
+    std::vector< std::vector< real_num_mov > > Jac_qp(dim);
+    for (unsigned d = 0; d < dim; d++) Jac_qp[d].resize(space_dim);
+    for (unsigned d = 0; d < space_dim; d++) JacI_qp[d].resize(dim);
 
-  MultiLevelSolution*  ml_sol        = ml_prob._ml_sol;  // pointer to the multilevel solution object
-  Solution*    sol        = ml_prob._ml_sol->GetSolutionLevel(level);    // pointer to the solution (level) object
+    real_num_mov detJac_qp = (real_num_mov)0.0;
+    real_num_mov weight_qp = (real_num_mov)0.0;
 
-  LinearEquationSolver* pdeSys        = mlPdeSys->_LinSolver[level]; // pointer to the equation (level) object
-  SparseMatrix*    KK         = pdeSys->_KK;  // pointer to the global stifness matrix object in pdeSys (level)
-  NumericVector*   RES          = pdeSys->_RES; // pointer to the global residual vector object in pdeSys (level)
+    unsigned xType = CONTINUOUS_BIQUADRATIC; // geometry FE type
 
-  const unsigned  dim = msh->GetDimension(); // get the domain dimension of the problem
-  unsigned    iproc = msh->processor_id(); // get the process_id (for parallel computation)
+    CurrentElem < real_num_mov > geom_element(dim, msh);
+    Phi < real_num_mov > geom_element_phi_dof_qp(dim_offset_grad);
 
- const std::string solname_u = ml_sol->GetSolName_string_vec()[0];
-  unsigned soluIndex = ml_sol->GetIndex(solname_u.c_str());    // get the position of "u" in the ml_sol object
-  unsigned solFEType_u = ml_sol->GetSolutionType(soluIndex);    // get the finite element type for "u"
-  unsigned soluPdeIndex = mlPdeSys->GetSolPdeIndex(solname_u.c_str());    // get the position of "u" in the pdeSys object
-
-  SparseMatrix*             JAC = pdeSys->_KK;
-  std::vector < adept::adouble >  solu; // local solution
-
-
-  const std::string solname_sxx = ml_sol->GetSolName_string_vec()[1];
-  unsigned solsxxIndex = ml_sol->GetIndex(solname_sxx.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_sxx = ml_sol->GetSolutionType(solsxxIndex);    // get the finite element type for "sxx"
-  unsigned solsxxPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxx.c_str());    // get the position of "sxx" in the pdeSys object
-  std::vector < adept::adouble >  solsxx; // local solution
-
-  const std::string solname_sxy = ml_sol->GetSolName_string_vec()[2];
-  unsigned solsxyIndex = ml_sol->GetIndex(solname_sxy.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_sxy = ml_sol->GetSolutionType(solsxyIndex);    // get the finite element type for "v"
-  unsigned solsxyPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxy.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solsxy; // local solution
-
-  const std::string solname_syy = ml_sol->GetSolName_string_vec()[3];
-  unsigned solsyyIndex = ml_sol->GetIndex(solname_syy.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_syy = ml_sol->GetSolutionType(solsyyIndex);    // get the finite element type for "v"
-  unsigned solsyyPdeIndex = mlPdeSys->GetSolPdeIndex(solname_syy.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solsyy; // local solution
-
-
-   const std::string solname_ud = ml_sol->GetSolName_string_vec()[4];
-  unsigned soludIndex = ml_sol->GetIndex(solname_ud.c_str());    // get the position of "u" in the ml_sol object
-  unsigned solFEType_ud = ml_sol->GetSolutionType(soludIndex);    // get the finite element type for "u"
-  unsigned soludPdeIndex = mlPdeSys->GetSolPdeIndex(solname_ud.c_str());    // get the position of "u" in the pdeSys object
-  std::vector < adept::adouble >  solud; // local solution
-
-
-  const std::string solname_sxxd = ml_sol->GetSolName_string_vec()[5];
-  unsigned solsxxdIndex = ml_sol->GetIndex(solname_sxxd.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_sxxd = ml_sol->GetSolutionType(solsxxdIndex);    // get the finite element type for "sxx"
-  unsigned solsxxdPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxxd.c_str());    // get the position of "sxx" in the pdeSys object
-  std::vector < adept::adouble >  solsxxd; // local solution
-
-  const std::string solname_sxyd = ml_sol->GetSolName_string_vec()[6];
-  unsigned solsxydIndex = ml_sol->GetIndex(solname_sxyd.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_sxyd = ml_sol->GetSolutionType(solsxydIndex);    // get the finite element type for "v"
-  unsigned solsxydPdeIndex = mlPdeSys->GetSolPdeIndex(solname_sxyd.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solsxyd; // local solution
-
-  const std::string solname_syyd = ml_sol->GetSolName_string_vec()[7];
-  unsigned solsyydIndex = ml_sol->GetIndex(solname_syyd.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_syyd = ml_sol->GetSolutionType(solsyydIndex);    // get the finite element type for "v"
-  unsigned solsyydPdeIndex = mlPdeSys->GetSolPdeIndex(solname_syyd.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solsyyd; // local solution
-
-
-
-
-
-
-  const std::string solname_w = ml_sol->GetSolName_string_vec()[8];
-  unsigned solwIndex = ml_sol->GetIndex(solname_w.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_w = ml_sol->GetSolutionType(solwIndex);    // get the finite element type for "v"
-  unsigned solwPdeIndex = mlPdeSys->GetSolPdeIndex(solname_w.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solw; // local solution
-
-
-  const std::string solname_wsxxd = ml_sol->GetSolName_string_vec()[9];
-  unsigned solwsxxdIndex = ml_sol->GetIndex(solname_wsxxd.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_wsxxd = ml_sol->GetSolutionType(solwsxxdIndex);    // get the finite element type for "sxx"
-  unsigned solwsxxdPdeIndex = mlPdeSys->GetSolPdeIndex(solname_wsxxd.c_str());    // get the position of "sxx" in the pdeSys object
-  std::vector < adept::adouble >  solwsxxd; // local solution
-
-  const std::string solname_wsxyd = ml_sol->GetSolName_string_vec()[10];
-  unsigned solwsxydIndex = ml_sol->GetIndex(solname_wsxyd.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_wsxyd = ml_sol->GetSolutionType(solwsxydIndex);    // get the finite element type for "v"
-  unsigned solwsxydPdeIndex = mlPdeSys->GetSolPdeIndex(solname_wsxyd.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solwsxyd; // local solution
-
-  const std::string solname_wsyyd = ml_sol->GetSolName_string_vec()[11];
-  unsigned solwsyydIndex = ml_sol->GetIndex(solname_wsyyd.c_str());    // get the position of "v" in the ml_sol object
-  unsigned solFEType_wsyyd = ml_sol->GetSolutionType(solwsyydIndex);    // get the finite element type for "v"
-  unsigned solwsyydPdeIndex = mlPdeSys->GetSolPdeIndex(solname_wsyyd.c_str());    // get the position of "v" in the pdeSys object
-  std::vector < adept::adouble >  solwsyyd; // local solution
-
-
-
-  std::vector < std::vector < double > > x(dim);    // local coordinates
-  unsigned xType = 2; // get the finite element type for "x", it is always 2 (LAGRANGE QUADRATIC)
-
-  std::vector < int > sysDof; // local to global pdeSys dofs
-  std::vector <double> phi;  // local test function
-  std::vector <double> phi_x; // local test function first order partial derivatives
-  std::vector <double> phi_xx; // local test function second order partial derivatives
-  double weight; // gauss point weight
-
-  std::vector < double > Res; // local redidual vector
-  std::vector < adept::adouble > aResu; // local redidual vector
-  std::vector < adept::adouble > aRessxx; // local redidual vector
-  std::vector < adept::adouble > aRessxy; // local redidual vector
-  std::vector < adept::adouble > aRessyy; // local redidual vector
-  std::vector < adept::adouble > aResud; // local redidual vector
-  std::vector < adept::adouble > aRessxxd; // local redidual vector
-  std::vector < adept::adouble > aRessxyd; // local redidual vector
-  std::vector < adept::adouble > aRessyyd; // local redidual vector
-
-  std::vector < adept::adouble > aResw; // local redidual vector
-  std::vector < adept::adouble > aReswsxxd; // local redidual vector
-  std::vector < adept::adouble > aReswsxyd; // local redidual vector
-  std::vector < adept::adouble > aReswsyyd; // local redidual vector
-
-  // reserve memory for the local standar vectors
-  const unsigned maxSize = static_cast< unsigned >(ceil(pow(3, dim)));          // conservative: based on line3, quad9, hex27
-  solu.reserve(maxSize);
-  solsxx.reserve(maxSize);
-  solsxy.reserve(maxSize);
-  solsyy.reserve(maxSize);
-  solud.reserve(maxSize);
-  solsxxd.reserve(maxSize);
-  solsxyd.reserve(maxSize);
-  solsyyd.reserve(maxSize);
-
-  solw.reserve(maxSize);
-  solwsxxd.reserve(maxSize);
-  solwsxyd.reserve(maxSize);
-  solwsyyd.reserve(maxSize);
-
-  for (unsigned i = 0; i < dim; i++)
-    x[i].reserve(maxSize);
-
-  sysDof.reserve(12 * maxSize);
-
-  phi.reserve(maxSize);
-  phi_x.reserve(maxSize * dim);
-// // //   unsigned dim2 = (3 * (dim - 1) + !(dim - 1));        // dim2 is the number of second order partial derivatives (1,3,6 depending on the dimension)
-    unsigned dim2 = (24 * (dim - 1) + !(dim - 1));        // dim2 is the number of second order partial derivatives (1,3,6 depending on the dimension)
-
-  phi_xx.reserve(maxSize * dim2);
-
-  Res.reserve(12 * maxSize);
-  aResu.reserve(maxSize);
-  aRessxx.reserve(maxSize);
-  aRessxy.reserve(maxSize);
-  aRessyy.reserve(maxSize);
-  aResud.reserve(maxSize);
-  aRessxxd.reserve(maxSize);
-  aRessxyd.reserve(maxSize);
-  aRessyyd.reserve(maxSize);
-
-  aResw.reserve(maxSize);
-  aReswsxxd.reserve(maxSize);
-  aReswsxyd.reserve(maxSize);
-  aReswsyyd.reserve(maxSize);
-
-  std::vector < double > Jac; // local Jacobian matrix (ordered by column, adept)
-  Jac.reserve(12 * maxSize * maxSize);
-
-  KK->zero(); // Set to zero all the entries of the Global Matrix
-
-
-double alpha = .001 ;
-double nu =  0. /* Poisson ratio value */;
-double beta = 0.01;
-double gamma = 0.01;
-
-
-  for (int iel = msh->GetElementOffset(iproc); iel < msh->GetElementOffset(iproc + 1); iel++) {
-
-    short unsigned ielGeom = msh->GetElementType(iel); 
-
-// // //     unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
-    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_sxx);    // number of solution element dofs
-
-
-
-    unsigned nDofs2 = msh->GetElementDofNumber(iel, xType);    // number of coordinate element dofs
-
-    std::vector<unsigned> Sol_n_el_dofs_Mat_vol(12, nDofs);
-
-    // resize local arrays
-    sysDof.resize(12 * nDofs);
-    solu.resize(nDofs);
-    solsxx.resize(nDofs);
-    solsxy.resize(nDofs);
-    solsyy.resize(nDofs);
-    solud.resize(nDofs);
-    solsxxd.resize(nDofs);
-    solsxyd.resize(nDofs);
-    solsyyd.resize(nDofs);
-
-    solw.resize(nDofs);
-    solwsxxd.resize(nDofs);
-    solwsxyd.resize(nDofs);
-    solwsyyd.resize(nDofs);
-
-    for (int i = 0; i < dim; i++) {
-      x[i].resize(nDofs2);
+    // Unknowns setup - expect 12 unknowns
+    const unsigned int n_unknowns = mlPdeSys->GetSolPdeIndex().size();
+    if (n_unknowns < 12) {
+        std::cerr << "AssembleBilaplaceProblem: expected 12 unknowns but found " << n_unknowns << "\n";
+        return;
     }
 
-    aResu.assign(nDofs, 0.);    //resize
-    aRessxx.assign(nDofs, 0.);    //resize
-    aRessxy.assign(nDofs, 0.0);
-    aRessyy.assign(nDofs, 0.0);
-    aResud.assign(nDofs, 0.);    //resize
-    aRessxxd.assign(nDofs, 0.);    //resize
-    aRessxyd.assign(nDofs, 0.0);
-    aRessyyd.assign(nDofs, 0.0);
+    std::vector < UnknownLocal < real_num > > unknowns_local(n_unknowns);
+    std::vector < Phi < real_num > > unknowns_phi_dof_qp(n_unknowns, Phi< real_num >(dim_offset_grad));
 
-    aResw.assign(nDofs, 0.0);
-    aReswsxxd.assign(nDofs, 0.);    //resize
-    aReswsxyd.assign(nDofs, 0.0);
-    aReswsyyd.assign(nDofs, 0.0);
-
-    // local storage of global mapping and solution
-    for (unsigned i = 0; i < nDofs; i++) {
-
-// // //       unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_u);    // global to global mapping between solution node and solution dof
-      unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_sxx);    // global to global mapping between solution node and solution dof
-
-
-
-      solu[i]          = (*sol->_Sol[soluIndex])(solDof);      // global extraction and local storage for the solution
-      solsxx[i]          = (*sol->_Sol[solsxxIndex])(solDof);      // global extraction and local storage for the solution
-      solsxy[i]         = (*sol->_Sol[solsxyIndex])(solDof);      // sxy  -> secondary row2, col2
-      solsyy[i]         = (*sol->_Sol[solsyyIndex])(solDof);      // syy  -> secondary row1, col2
-      solud[i]          = (*sol->_Sol[soludIndex])(solDof);      // global extraction and local storage for the solution
-      solsxxd[i]          = (*sol->_Sol[solsxxdIndex])(solDof);      // global extraction and local storage for the solution
-      solsxyd[i]         = (*sol->_Sol[solsxydIndex])(solDof);      // sxy  -> secondary row2, col2
-      solsyyd[i]         = (*sol->_Sol[solsyydIndex])(solDof);      // syy  -> secondary row1, col2
-
-      solw[i]         = (*sol->_Sol[solwIndex])(solDof);      // syy  -> secondary row1, col2
-      solwsxxd[i]          = (*sol->_Sol[solwsxxdIndex])(solDof);      // global extraction and local storage for the solution
-      solwsxyd[i]         = (*sol->_Sol[solwsxydIndex])(solDof);      // sxy  -> secondary row2, col2
-      solwsyyd[i]         = (*sol->_Sol[solwsyydIndex])(solDof);      // syy  -> secondary row1, col2
-
-
-      sysDof[i]             = pdeSys->GetSystemDof(soluIndex, soluPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[nDofs + i]     = pdeSys->GetSystemDof(solsxxIndex, solsxxPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[2 * nDofs + i] = pdeSys->GetSystemDof(solsxyIndex, solsxyPdeIndex, i, iel); // sxy
-      sysDof[3 * nDofs + i] = pdeSys->GetSystemDof(solsyyIndex, solsyyPdeIndex, i, iel); // syy
-      sysDof[4 * nDofs + i] = pdeSys->GetSystemDof(soludIndex, soludPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[5 * nDofs + i]     = pdeSys->GetSystemDof(solsxxdIndex, solsxxdPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[6 * nDofs + i] = pdeSys->GetSystemDof(solsxydIndex, solsxydPdeIndex, i, iel); // sxy
-      sysDof[7 * nDofs + i] = pdeSys->GetSystemDof(solsyydIndex, solsyydPdeIndex, i, iel); // syy
-
-      sysDof[8 * nDofs + i] = pdeSys->GetSystemDof(solwIndex, solwPdeIndex, i, iel); // syy
-      sysDof[9 * nDofs + i]     = pdeSys->GetSystemDof(solwsxxdIndex, solwsxxdPdeIndex, i, iel);    // global to global mapping between solution node and pdeSys dof
-      sysDof[10 * nDofs + i] = pdeSys->GetSystemDof(solwsxydIndex, solwsxydPdeIndex, i, iel); // sxy
-      sysDof[11 * nDofs + i] = pdeSys->GetSystemDof(solwsyydIndex, solwsyydPdeIndex, i, iel); // syy
-
-
+    for (int u = 0; u < (int)n_unknowns; u++) {
+        unknowns_local[u].initialize(dim_offset_grad, unknowns[u], ml_sol, mlPdeSys);
     }
 
-    // local storage of coordinates
-    for (unsigned i = 0; i < nDofs; i++) {
-      unsigned xDof  = msh->GetSolutionDof(i, iel, xType); // global to global mapping between coordinates node and coordinate dof
+    ElementJacRes < real_num > unk_element_jac_res(dim, unknowns_local);
 
-      for (unsigned jdim = 0; jdim < dim; jdim++) {
-        x[jdim][i] = (*msh->GetTopology()->_Sol[jdim])(xDof);  // global extraction and local storage for the element coordinates
-      }
-    }
+    // element loop
+    for (int iel = msh->GetElementOffset(iproc); iel < msh->GetElementOffset(iproc + 1); iel++) {
 
-    // start a new recording of all the operations involving adept::adouble variables
-    s.new_recording();
+        // Geometry
+        geom_element.set_coords_at_dofs_and_geom_type(iel, xType);
+        geom_element.set_elem_center_3d(iel, xType);
+        const short unsigned ielGeom = geom_element.geom_type();
 
-    // *** Gauss point loop ***
-
-    for (unsigned ig = 0; ig < msh->_finiteElement[ielGeom][solFEType_sxx]->GetGaussPointNumber(); ig++) {
-// *** get gauss point weight, test function and test function partial derivatives ***
-
-      msh->_finiteElement[ielGeom][solFEType_sxx]->Jacobian(x, ig, weight, phi, phi_x, phi_xx);
-
-      // evaluate the solution, the solution derivatives and the coordinates in the gauss point
-      adept::adouble soluGauss = 0;
-      std::vector < adept::adouble > soluGauss_x(dim, 0.);
-
-      adept::adouble solsxxGauss = 0;
-      std::vector < adept::adouble > solsxxGauss_x(dim, 0.);
-
-      adept::adouble solsxyGauss = 0;
-      std::vector < adept::adouble > solsxyGauss_x(dim, 0.);
-
-      adept::adouble solsyyGauss = 0;
-      std::vector < adept::adouble > solsyyGauss_x(dim, 0.);
-
-      adept::adouble soludGauss = 0;
-      std::vector < adept::adouble > soludGauss_x(dim, 0.);
-
-      adept::adouble solsxxdGauss = 0;
-      std::vector < adept::adouble > solsxxdGauss_x(dim, 0.);
-
-      adept::adouble solsxydGauss = 0;
-      std::vector < adept::adouble > solsxydGauss_x(dim, 0.);
-
-      adept::adouble solsyydGauss = 0;
-      std::vector < adept::adouble > solsyydGauss_x(dim, 0.);
-
-      adept::adouble solwGauss = 0;
-      std::vector < adept::adouble > solwGauss_x(dim, 0.);
-
-      adept::adouble solwsxxdGauss = 0;
-      std::vector < adept::adouble > solwsxxdGauss_x(dim, 0.);
-
-      adept::adouble solwsxydGauss = 0;
-      std::vector < adept::adouble > solwsxydGauss_x(dim, 0.);
-
-      adept::adouble solwsyydGauss = 0;
-      std::vector < adept::adouble > solwsyydGauss_x(dim, 0.);
-
-      std::vector < double > xGauss(dim, 0.);
-
-      for (unsigned i = 0; i < nDofs; i++) {
-        soluGauss += phi[i] * solu[i];
-        solsxxGauss += phi[i] * solsxx[i];
-
-        solsxyGauss += phi[i] * solsxy[i];
-        solsyyGauss += phi[i] * solsyy[i];
-
-        soludGauss += phi[i] * solud[i];
-        solsxxdGauss += phi[i] * solsxxd[i];
-
-        solsxydGauss += phi[i] * solsxyd[i];
-        solsyydGauss += phi[i] * solsyyd[i];
-
-        solwGauss += phi[i] * solw[i];
-        solwsxxdGauss += phi[i] * solwsxxd[i];
-
-        solwsxydGauss += phi[i] * solwsxyd[i];
-        solwsyydGauss += phi[i] * solwsyyd[i];
-
-        for (unsigned jdim = 0; jdim < dim; jdim++) {
-          soluGauss_x[jdim] += phi_x[i * dim + jdim] * solu[i];
-          solsxxGauss_x[jdim] += phi_x[i * dim + jdim] * solsxx[i];
-
-          solsxyGauss_x[jdim] += phi_x[i * dim + jdim] * solsxy[i];
-          solsyyGauss_x[jdim] += phi_x[i * dim + jdim] * solsyy[i];
-
-          soludGauss_x[jdim] += phi_x[i * dim + jdim] * solud[i];
-          solsxxdGauss_x[jdim] += phi_x[i * dim + jdim] * solsxxd[i];
-
-          solsxydGauss_x[jdim] += phi_x[i * dim + jdim] * solsxyd[i];
-          solsyydGauss_x[jdim] += phi_x[i * dim + jdim] * solsyyd[i];
-
-          solwGauss_x[jdim] += phi_x[i * dim + jdim] * solw[i];
-          solwsxxdGauss_x[jdim] += phi_x[i * dim + jdim] * solwsxxd[i];
-
-          solwsxydGauss_x[jdim] += phi_x[i * dim + jdim] * solwsxyd[i];
-          solwsyydGauss_x[jdim] += phi_x[i * dim + jdim] * solwsyyd[i];
-
-          xGauss[jdim] += x[jdim][i] * phi[i];
+        // Unknown local DOFs
+        for (unsigned u = 0; u < n_unknowns; u++) {
+            unknowns_local[u].set_elem_dofs(iel, msh, sol);
         }
-      }
-      // *** phi_i loop ***
-      for (unsigned i = 0; i < nDofs; i++) {
 
-        adept::adouble Laplace_u = 0.;
-        adept::adouble Laplace_sxx = 0.;
+        // Prepare local mapping / storage
+        unk_element_jac_res.set_loc_to_glob_map(iel, msh, pdeSys);
+        const unsigned total_local_dofs = unk_element_jac_res.dof_map().size();
+        unk_element_jac_res.res().assign(total_local_dofs, (real_num)0.0);
+        unk_element_jac_res.jac().assign(total_local_dofs * total_local_dofs, (real_num)0.0);
 
-        adept::adouble Laplace_sxy = 0.;
-        adept::adouble Laplace_syy = 0.;
-
-        adept::adouble Laplace_ud = 0.;
-        adept::adouble Laplace_sxxd = 0.;
-
-        adept::adouble Laplace_sxyd = 0.;
-        adept::adouble Laplace_syyd = 0.;
-        adept::adouble Laplace_w = 0.;
-        adept::adouble Laplace_wsxxd = 0.;
-
-        adept::adouble Laplace_wsxyd = 0.;
-        adept::adouble Laplace_wsyyd = 0.;
-
-        adept::adouble M_u = phi[i] * soluGauss;
-
-        adept::adouble M_sxx = phi[i] * solsxxGauss /*+ nu * phi[i] * solsxxGauss*/;
-        adept::adouble M_sxy =  2.*  phi[i] * solsxyGauss;
-        adept::adouble M_syy = phi[i] * solsyyGauss /*+ nu * phi[i] * solsyyGauss*/;
-        adept::adouble M_ud = phi[i] * soludGauss;
-        adept::adouble M_sxxd = phi[i] * solsxxdGauss /*+ nu * phi[i] * solsxxdGauss*/;
-        adept::adouble M_sxyd =  2.* phi[i] * solsxydGauss;
-        adept::adouble M_syyd = phi[i] * solsyydGauss /*+ nu * phi[i] * solsyydGauss*/;
-
-        adept::adouble M_w = phi[i] * solwGauss;
-        adept::adouble M_wsxxd = phi[i] * solwsxxdGauss /*+ nu * phi[i] * solwsxxdGauss*/;
-        adept::adouble M_wsxyd =  2. * phi[i] * solwsxydGauss;
-        adept::adouble M_wsyyd = phi[i] * solwsyydGauss /*+ nu * phi[i] * solwsyydGauss*/;
-
-
-
-        for (unsigned jdim = 0; jdim < dim; jdim++) {
-          Laplace_u   +=  - phi_x[i * dim + jdim] * soluGauss_x[jdim];
-          Laplace_sxx   +=  - phi_x[i * dim + jdim] * solsxxGauss_x[jdim];
-
-          Laplace_sxy   +=  - phi_x[i * dim + jdim] * solsxyGauss_x[jdim];
-          Laplace_syy   +=  - phi_x[i * dim + jdim] * solsyyGauss_x[jdim];
-
-          Laplace_ud   +=  - phi_x[i * dim + jdim] * soludGauss_x[jdim];
-          Laplace_sxxd   +=  - phi_x[i * dim + jdim] * solsxxdGauss_x[jdim];
-
-          Laplace_sxyd   +=  - phi_x[i * dim + jdim] * solsxydGauss_x[jdim];
-          Laplace_syyd   +=  - phi_x[i * dim + jdim] * solsyydGauss_x[jdim];
-
-          Laplace_w   +=  - phi_x[i * dim + jdim] * solwGauss_x[jdim];
-          Laplace_wsxxd   +=  - phi_x[i * dim + jdim] * solwsxxdGauss_x[jdim];
-
-          Laplace_wsxyd   +=  - phi_x[i * dim + jdim] * solwsxydGauss_x[jdim];
-          Laplace_wsyyd   +=  - phi_x[i * dim + jdim] * solwsyydGauss_x[jdim];
+        // Cache of per-unknown number of local dofs
+        std::vector<unsigned> unk_num_elem_dofs(n_unknowns);
+        for (unsigned u = 0; u < n_unknowns; u++) {
+            unk_num_elem_dofs[u] = unknowns_local[u].num_elem_dofs();
         }
-        adept::adouble M_w_comb = beta * phi[i] * solwGauss + gamma * Laplace_w;
-        double pi = acos(-1.);
 
-    adept::adouble Bxxu = 0.;
-    adept::adouble Bxyu = 0.;
-    adept::adouble Byyu = 0.;
-    adept::adouble Bxx = 0.;
-    adept::adouble Bxy = 0.;
-    adept::adouble Byy = 0.;
+                // Local lengths for each unknown
+        const unsigned nDofs_u = unk_num_elem_dofs[0];
+        const unsigned nDofs_sxx = unk_num_elem_dofs[1];
+        const unsigned nDofs_sxy = unk_num_elem_dofs[2];
+        const unsigned nDofs_syy = unk_num_elem_dofs[3];
+        const unsigned nDofs_ud = unk_num_elem_dofs[4];
+        const unsigned nDofs_sxxd = unk_num_elem_dofs[5];
+        const unsigned nDofs_sxyd = unk_num_elem_dofs[6];
+        const unsigned nDofs_syyd = unk_num_elem_dofs[7];
+        const unsigned nDofs_w = unk_num_elem_dofs[8];
+        const unsigned nDofs_wsxxd = unk_num_elem_dofs[9];
+        const unsigned nDofs_wsxyd = unk_num_elem_dofs[10];
+        const unsigned nDofs_wsyyd = unk_num_elem_dofs[11];
 
-    adept::adouble Bxxud = 0.;
-    adept::adouble Bxyud = 0.;
-    adept::adouble Byyud = 0.;
-    adept::adouble Bxxd = 0.;
-    adept::adouble Bxyd = 0.;
-    adept::adouble Byyd = 0.;
 
-    adept::adouble Bwxxud = 0.;
-    adept::adouble Bwxyud = 0.;
-    adept::adouble Bwyyud = 0.;
-    adept::adouble Bwxxu = 0.;
-    adept::adouble Bwxyu = 0.;
-    adept::adouble Bwyyu = 0.;
+        // Gauss loop
+        const unsigned nGauss = quad_rules[ielGeom].GetGaussPointsNumber();
+        for (unsigned ig = 0; ig < nGauss; ig++) {
 
-       // if (dim == 2) {
+            // Jacobian (element geometry)
+            elem_all_for_domain[ielGeom][xType]->JacJacInv(geom_element.get_coords_at_dofs_3d(), ig, Jac_qp, JacI_qp, detJac_qp, space_dim);
+            weight_qp = detJac_qp * quad_rules[ielGeom].GetGaussWeightsPointer()[ig];
 
-        // // // Bxxu += phi_x[i * dim] * soluGauss_x[0] + nu * phi_x[i * dim + 1] * soluGauss_x[1];
-        // // //
-        // // // Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
-        // // //
-        // // // Byyu += nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
-        // // //
-        // // // Bxx += phi_x[i * dim] * solsxxGauss_x[0];
-        // // //
-        // // // Bxy +=( (phi_x[i * dim + 1 ] * solsxyGauss_x[0] + phi_x[i * dim ] * solsxyGauss_x[1]) );
-        // // // Byy +=  phi_x[i * dim + 1] * solsyyGauss_x[1];
-        // // //
-        // // // Bxxud += phi_x[i * dim] * soludGauss_x[0] + nu * phi_x[i * dim + 1] * soludGauss_x[1];
-        // // //
-        // // // Bxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
-        // // //
-        // // // Byyud += nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
-        // // //
-        // // // Bxxd += phi_x[i * dim] * solsxxdGauss_x[0] + nu * phi_x[i * dim + 1] * solsxxdGauss_x[1];
-        // // //
-        // // // Bxyd +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1] * solsxydGauss_x[0] );
-        // // //
-        // // // Byyd +=  nu * phi_x[i * dim] * solsyydGauss_x[0] + phi_x[i * dim + 1] * solsyydGauss_x[1];
-        // // //
-        // // // Bwxxud += phi_x[i * dim] * soludGauss_x[0] + nu * phi_x[i * dim + 1] * soludGauss_x[1];
-        // // //
-        // // // Bwxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
-        // // //
-        // // // Bwyyud += nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
+            // Evaluate shape functions
+            for (unsigned u = 0; u < n_unknowns; u++) {
+                elem_all[ielGeom][unknowns_local[u].fe_type()]->shape_funcs_current_elem(
+                    ig, JacI_qp,
+                    unknowns_phi_dof_qp[u].phi(),
+                    unknowns_phi_dof_qp[u].phi_grad(),
+                    unknowns_phi_dof_qp[u].phi_hess(),
+                    space_dim
+                );
+            }
 
+            // Geometry shape functions (for coordinate interpolation)
+            elem_all_for_domain[ielGeom][xType]->shape_funcs_current_elem(
+                ig, JacI_qp,
+                geom_element_phi_dof_qp.phi(),
+                geom_element_phi_dof_qp.phi_grad(),
+                geom_element_phi_dof_qp.phi_hess(),
+                space_dim
+            );
+
+
+
+            // Source terms
+
+            // NOTE: In the AD code, 'udr_term' was used in aRessyyd.
+            // Also used assemble_function_for_rhs in 'aResu' as F_term,
+            // but usually aResu is div(sigma)=0. Checking logic...
+            // In AD code: aRessyyd += ... - udr_term.
+
+            // Unpack Shape Functions for readability
+            auto& phi_u = unknowns_phi_dof_qp[0].phi();
+            auto& gradphi_u = unknowns_phi_dof_qp[0].phi_grad();
+
+            auto& phi_sxx = unknowns_phi_dof_qp[1].phi();
+            auto& gradphi_sxx = unknowns_phi_dof_qp[1].phi_grad();
+
+            auto& phi_sxy = unknowns_phi_dof_qp[2].phi();
+            auto& gradphi_sxy = unknowns_phi_dof_qp[2].phi_grad();
+
+            auto& phi_syy = unknowns_phi_dof_qp[3].phi();
+            auto& gradphi_syy = unknowns_phi_dof_qp[3].phi_grad();
+
+            auto& phi_ud = unknowns_phi_dof_qp[4].phi();
+            auto& gradphi_ud = unknowns_phi_dof_qp[4].phi_grad();
+
+            auto& phi_sxxd = unknowns_phi_dof_qp[5].phi();
+            auto& gradphi_sxxd = unknowns_phi_dof_qp[5].phi_grad();
+
+            auto& phi_sxyd = unknowns_phi_dof_qp[6].phi();
+            auto& gradphi_sxyd = unknowns_phi_dof_qp[6].phi_grad();
+
+            auto& phi_syyd = unknowns_phi_dof_qp[7].phi();
+            auto& gradphi_syyd = unknowns_phi_dof_qp[7].phi_grad();
+
+            auto& phi_w = unknowns_phi_dof_qp[8].phi();
+            auto& gradphi_w = unknowns_phi_dof_qp[8].phi_grad();
+
+            auto& phi_wsxxd = unknowns_phi_dof_qp[9].phi();
+            auto& gradphi_wsxxd = unknowns_phi_dof_qp[9].phi_grad();
+
+            auto& phi_wsxyd = unknowns_phi_dof_qp[10].phi();
+            auto& gradphi_wsxyd = unknowns_phi_dof_qp[10].phi_grad();
+
+            auto& phi_wsyyd = unknowns_phi_dof_qp[11].phi();
+            auto& gradphi_wsyyd = unknowns_phi_dof_qp[11].phi_grad();
+
+            // Interpolate solution values & gradients at gauss point for each unknown
+            real_num_mov u_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_u_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_u; ++a) {
+                u_val_g += (real_num_mov) phi_u[a] * (real_num_mov) unknowns_local[0].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_u_g[d] += (real_num_mov) gradphi_u[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[0].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov sxx_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_sxx_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_sxx; ++a) {
+                sxx_val_g += (real_num_mov) phi_sxx[a] * (real_num_mov) unknowns_local[1].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_sxx_g[d] += (real_num_mov) gradphi_sxx[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[1].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov sxy_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_sxy_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_sxy; ++a) {
+                sxy_val_g += (real_num_mov) phi_sxy[a] * (real_num_mov) unknowns_local[2].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_sxy_g[d] += (real_num_mov) gradphi_sxy[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[2].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov syy_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_syy_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_syy; ++a) {
+                syy_val_g += (real_num_mov) phi_syy[a] * (real_num_mov) unknowns_local[3].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_syy_g[d] += (real_num_mov) gradphi_syy[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[3].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov ud_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_ud_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_ud; ++a) {
+                ud_val_g += (real_num_mov) phi_ud[a] * (real_num_mov) unknowns_local[4].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_ud_g[d] += (real_num_mov) gradphi_ud[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[4].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov sxxd_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_sxxd_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_sxxd; ++a) {
+                sxxd_val_g += (real_num_mov) phi_sxxd[a] * (real_num_mov) unknowns_local[5].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_sxxd_g[d] += (real_num_mov) gradphi_sxxd[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[5].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov sxyd_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_sxyd_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_sxyd; ++a) {
+                sxyd_val_g += (real_num_mov) phi_sxyd[a] * (real_num_mov) unknowns_local[6].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_sxyd_g[d] += (real_num_mov) gradphi_sxyd[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[6].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov syyd_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_syyd_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_syyd; ++a) {
+                syyd_val_g += (real_num_mov) phi_syyd[a] * (real_num_mov) unknowns_local[7].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_syyd_g[d] += (real_num_mov) gradphi_syyd[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[7].elem_dofs()[a];
+                }
+            }
+
+            real_num_mov w_val_g = (real_num_mov)0.0;
+            std::vector< real_num_mov > grad_w_g(dim_offset_grad, (real_num_mov)0.0);
+            for (unsigned a = 0; a < nDofs_w; ++a) {
+                w_val_g += (real_num_mov) phi_w[a] * (real_num_mov) unknowns_local[8].elem_dofs()[a];
+                for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                    grad_w_g[d] += (real_num_mov) gradphi_w[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[8].elem_dofs()[a];
+                }
+            }
+
+
+          real_num_mov wsxxd_val_g = (real_num_mov)0.0;
+          std::vector< real_num_mov > grad_wsxxd_g(dim_offset_grad, (real_num_mov)0.0);
+          for (unsigned a = 0; a < nDofs_wsxxd; ++a) {
+              wsxxd_val_g += (real_num_mov) phi_wsxxd[a] * (real_num_mov) unknowns_local[9].elem_dofs()[a];
+              for (unsigned d = 0; d < dim_offset_grad; ++d) {
+                   grad_wsxxd_g[d] += (real_num_mov) gradphi_wsxxd[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[9].elem_dofs()[a];
+             }
+         }
+
+real_num_mov wsxyd_val_g = (real_num_mov)0.0;
+std::vector< real_num_mov > grad_wsxyd_g(dim_offset_grad, (real_num_mov)0.0);
+for (unsigned a = 0; a < nDofs_wsxyd; ++a) {
+    wsxyd_val_g += (real_num_mov) phi_wsxyd[a] * (real_num_mov) unknowns_local[10].elem_dofs()[a];
+    for (unsigned d = 0; d < dim_offset_grad; ++d) {
+        grad_wsxyd_g[d] += (real_num_mov) gradphi_wsxyd[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[10].elem_dofs()[a];
+    }
+}
+
+real_num_mov wsyyd_val_g = (real_num_mov)0.0;
+std::vector< real_num_mov > grad_wsyyd_g(dim_offset_grad, (real_num_mov)0.0);
+for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
+    wsyyd_val_g += (real_num_mov) phi_wsyyd[a] * (real_num_mov) unknowns_local[11].elem_dofs()[a];
+    for (unsigned d = 0; d < dim_offset_grad; ++d) {
+        grad_wsyyd_g[d] += (real_num_mov) gradphi_wsyyd[a * dim_offset_grad + d] * (real_num_mov) unknowns_local[11].elem_dofs()[a];
+    }
+}
+
+
+            // Compute physical coordinates x_gss at gauss point
+            std::vector< real_num_mov > x_gss(dim, (real_num_mov)0.0);
+            auto & coords = geom_element.get_coords_at_dofs();
+            const unsigned nGeomDofs = coords[0].size();
+            for (unsigned a = 0; a < nGeomDofs; ++a) {
+                const real_num_mov geom_phi = (real_num_mov) geom_element_phi_dof_qp.phi()[a];
+                for (unsigned d = 0; d < dim; ++d) {
+                    x_gss[d] += (real_num_mov) coords[d][a] * geom_phi;
+                }
+            }
+
+                        const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss); // udr_term
+
+
+
+            // ==================== RESIDUALS & JACOBIANS ====================
+
+            // --- 1. Equation for u (aResu) ---
+            // AD: Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud
+            for (unsigned i = 0; i < nDofs_u; ++i) {
+                // Residual
+                real_num_mov div_sigma = 0.0;
+                real_num_mov div_sigma_w = 0.0;
+
+                // div(sigma): (grad_v, grad_sigma) pattern from AD code Bxx/Bxy/Byy
+                for (unsigned j = 0; j < nDofs_sxx; ++j) {
+            div_sigma += (real_num_mov)gradphi_u[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxx[j * dim_offset_grad] * (real_num_mov)unknowns_local[1].elem_dofs()[j];
+        }
+
+        // ∂σ_xy/∂y term
+        for (unsigned j = 0; j < nDofs_sxy; ++j) {
+            div_sigma += (real_num_mov)gradphi_u[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxy[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[2].elem_dofs()[j];
+        }
+        // ∂σ_xy/∂x term
+        for (unsigned j = 0; j < nDofs_sxy; ++j) {
+            div_sigma += (real_num_mov)gradphi_u[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxy[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[2].elem_dofs()[j];
+        }
+        // ∂σ_yy/∂y term
+        for (unsigned j = 0; j < nDofs_syy; ++j) {
+            div_sigma += (real_num_mov)gradphi_u[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syy[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[3].elem_dofs()[j];
+        }
+                // div(sigma_w) aka Bw...ud
+                for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
+            div_sigma_w += (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad] * (real_num_mov)unknowns_local[9].elem_dofs()[j];
+        }
+
+        // ∂σ_xy/∂y term
+        for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+            div_sigma_w += (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[10].elem_dofs()[j];
+        }
+        // ∂σ_xy/∂x term
+        for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+            div_sigma_w += (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[10].elem_dofs()[j];
+        }
+        // ∂σ_yy/∂y term
+        for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
+            div_sigma_w += (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[11].elem_dofs()[j];
+        }
+
+                unk_element_jac_res.res()[i] += (div_sigma + div_sigma_w) * weight_qp;
+
+                // Jacobian blocks - Fixed indexing issues
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_sxx; ++j) {
+        real_num_mov jac_usxx = (real_num_mov)gradphi_u[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxx[j*dim_offset_grad];
+        unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + j)] += (real_num)(jac_usxx * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxy; ++j) {
+        real_num_mov jac_usxy = (real_num_mov)gradphi_u[i * dim_offset_grad + 1] * (real_num_mov) gradphi_sxy [j * dim_offset_grad + 0] + (real_num_mov)gradphi_u[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxy[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + nDofs_sxx + j)] += (real_num)(jac_usxy * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_syy; ++j) {
+        real_num_mov jac_usyy = (real_num_mov)gradphi_u[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syy[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + j)] += (real_num)(jac_usyy * weight_qp);
+    }
+
+
+        for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
+        real_num_mov jac_wsxx = (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j*dim_offset_grad];
+        unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + j)] += (real_num)(jac_wsxx * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+        real_num_mov jac_wsxy = (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov) gradphi_wsxyd [j * dim_offset_grad + 0] + (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + j)] += (real_num)(jac_wsxy * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
+        real_num_mov jac_wsyy = (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + j)] += (real_num)(jac_wsyy * weight_qp);
+    }
+            }
+
+            // --- 2. Equation for sxx (aRessxx) ---
+            // AD: Bxxu + M_sxx
+
+            // Test functions for R_sxx (second equation): ε_xx(u) + s_xx = 0
+for (unsigned i = 0; i < nDofs_sxx; ++i) {
+    // R_sxx = ∫(ε_xx(u) + s_xx)·v_sxx dΩ
+    real_num_mov strain_xx = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_u; ++j) {
+            strain_xx += (real_num_mov)gradphi_sxx[i * dim_offset_grad + 0] * (real_num_mov)gradphi_u[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[0].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_sxx = 0.0;
+    for (unsigned j = 0; j < nDofs_sxx; ++j) {
+        mass_sxx += (real_num_mov)phi_sxx[i] * (real_num_mov)phi_sxx[j] * (real_num_mov)unknowns_local[1].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + i] += (real_num)((strain_xx + mass_sxx) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        real_num_mov jac_sxxu = (real_num_mov)gradphi_sxx[i * dim_offset_grad + 0] * (real_num_mov)gradphi_u[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(nDofs_u + i) * total_local_dofs + j] += (real_num)(jac_sxxu * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxx; ++j) {
+        real_num_mov jac_sxxsxx = (real_num_mov)phi_sxx[i] * (real_num_mov)phi_sxx[j];
+        unk_element_jac_res.jac()[(nDofs_u + i) * total_local_dofs + (nDofs_u + j)] += (real_num)(jac_sxxsxx * weight_qp);
+    }
+}
+
+// Test functions for R_sxy (third equation): 2ε_xy(u) + s_xy = 0
+for (unsigned i = 0; i < nDofs_sxy; ++i) {
+    // R_sxy = ∫(2ε_xy(u) + s_xy)·v_sxy dΩ
+    real_num_mov strain_xy = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_u; ++j) {
+            strain_xy += (real_num_mov)gradphi_sxy[i * dim_offset_grad + 0] * (real_num_mov)gradphi_u[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[0].elem_dofs()[j];
+            strain_xy += (real_num_mov)gradphi_sxy[i * dim_offset_grad + 1] * (real_num_mov)gradphi_u[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[0].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_sxy = 0.0;
+    for (unsigned j = 0; j < nDofs_sxy; ++j) {
+        mass_sxy += 2.0 * (real_num_mov)phi_sxy[i] * (real_num_mov)phi_sxy[j] * (real_num_mov)unknowns_local[2].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + i] += (real_num)((strain_xy + mass_sxy) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        real_num_mov jac_sxyu = (real_num_mov)gradphi_sxy[i * dim_offset_grad + 0] * (real_num_mov)gradphi_u[j * dim_offset_grad + 1] +
+                               (real_num_mov)gradphi_sxy[i * dim_offset_grad + 1] * (real_num_mov)gradphi_u[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + i) * total_local_dofs + j] += (real_num)(jac_sxyu * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxy; ++j) {
+        real_num_mov jac_sxysxy = 2.0 * (real_num_mov)phi_sxy[i] * (real_num_mov)phi_sxy[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + i) * total_local_dofs + (nDofs_u + nDofs_sxx + j)] += (real_num)(jac_sxysxy * weight_qp);
+    }
+}
+
+            // --- 4. Equation for syy (aRessyy) ---
+// Test functions for R_syy (fourth equation): ε_yy(u) + s_yy = 0
+for (unsigned i = 0; i < nDofs_syy; ++i) {
+    // R_syy = ∫(ε_yy(u) + s_yy)·v_syy dΩ
+    real_num_mov strain_yy = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_u; ++j) {
+            strain_yy += (real_num_mov)gradphi_syy[i * dim_offset_grad + 1] * (real_num_mov)gradphi_u[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[0].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_syy = 0.0;
+    for (unsigned j = 0; j < nDofs_syy; ++j) {
+        mass_syy += (real_num_mov)phi_syy[i] * (real_num_mov)phi_syy[j] * (real_num_mov)unknowns_local[3].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + i] += (real_num)((strain_yy + mass_syy) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        real_num_mov jac_syyu = (real_num_mov)gradphi_syy[i * dim_offset_grad + 1] * (real_num_mov)gradphi_u[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + i) * total_local_dofs + j] += (real_num)(jac_syyu * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_syy; ++j) {
+        real_num_mov jac_syysyy = (real_num_mov)phi_syy[i] * (real_num_mov)phi_syy[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + j)] += (real_num)(jac_syysyy * weight_qp);
+    }
+}
+
+// --- 5. Equation for ud ---
+for (unsigned i = 0; i < nDofs_ud; ++i) {
+    // R_ud = ∫(u + ∂σ_xxd/∂x + ∂σ_xyd/∂y + ∂σ_xyd/∂x + ∂σ_yyd/∂y + f)·v_ud dΩ
+    real_num_mov mass_u = 0.0;
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        mass_u += (real_num_mov)phi_ud[i] * (real_num_mov)phi_u[j] * (real_num_mov)unknowns_local[0].elem_dofs()[j];
+    }
+
+        real_num_mov mass_w = 0.0;
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        mass_w += (real_num_mov)phi_ud[i] * (real_num_mov)phi_w[j] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+    }
+
+    real_num_mov div_sigmad = 0.0;
+    if (dim == 2) {
+        // ∂σ_xxd/∂x term
+        for (unsigned j = 0; j < nDofs_sxxd; ++j) {
+            div_sigmad += (real_num_mov)gradphi_ud[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad] * (real_num_mov)unknowns_local[5].elem_dofs()[j];
+        }
+        // ∂σ_xyd/∂y term
+        for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+            div_sigmad += (real_num_mov)gradphi_ud[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[6].elem_dofs()[j];
+        }
+        // ∂σ_xyd/∂x term
+        for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+            div_sigmad += (real_num_mov)gradphi_ud[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[6].elem_dofs()[j];
+        }
+        // ∂σ_yyd/∂y term
+        for (unsigned j = 0; j < nDofs_syyd; ++j) {
+            div_sigmad += (real_num_mov)gradphi_ud[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[7].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov source_term = f_val * (real_num_mov)phi_ud[i];
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i] +=
+        (real_num)((mass_u + div_sigmad + mass_w) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        real_num_mov jac_udu = (real_num_mov)phi_ud[i] * (real_num_mov)phi_u[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + i) * total_local_dofs + j] += (real_num)(jac_udu * weight_qp);
+    }
+
+        for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_wdu = (real_num_mov)phi_ud[i] * (real_num_mov)phi_w[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wdu * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxxd; ++j) {
+        real_num_mov jac_udsxxd = (real_num_mov)gradphi_ud[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + j)] += (real_num)(jac_udsxxd * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+        real_num_mov jac_udsxyd = (real_num_mov)gradphi_ud[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 0] + (real_num_mov)gradphi_ud[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + j)] += (real_num)(jac_udsxyd * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_syyd; ++j) {
+        real_num_mov jac_udsyyd = (real_num_mov)gradphi_ud[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + j)] += (real_num)(jac_udsyyd * weight_qp);
+    }
+}
+
+
+// Sixth equation
+
+for (unsigned i = 0; i < nDofs_sxxd; ++i) {
+    // R_sxxd = ∫(ε_xx(ud) + s_xxd)·v_sxxd dΩ
+    real_num_mov strain_xx_ud = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_ud; ++j) {
+            strain_xx_ud += (real_num_mov)gradphi_sxxd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_sxxd = 0.0;
+    for (unsigned j = 0; j < nDofs_sxxd; ++j) {
+        mass_sxxd += (real_num_mov)phi_sxxd[i] * (real_num_mov)phi_sxxd[j] * (real_num_mov)unknowns_local[5].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + i] +=
+        (real_num)((strain_xx_ud + mass_sxxd) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_ud; ++j) {
+        real_num_mov jac_sxxdud = (real_num_mov)gradphi_sxxd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + j)] += (real_num)(jac_sxxdud * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxxd; ++j) {
+        real_num_mov jac_sxxdsxxd = (real_num_mov)phi_sxxd[i] * (real_num_mov)phi_sxxd[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + j)] += (real_num)(jac_sxxdsxxd * weight_qp);
+    }
+}
+
+// Test functions for R_sxyd (seventh equation): 2ε_xy(ud) + s_xyd = 0
+for (unsigned i = 0; i < nDofs_sxyd; ++i) {
+    // R_sxyd = ∫(2ε_xy(ud) + s_xyd)·v_sxyd dΩ
+    real_num_mov strain_xy_ud = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_ud; ++j) {
+            strain_xy_ud += (real_num_mov)gradphi_sxyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+            strain_xy_ud += (real_num_mov)gradphi_sxyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_sxyd = 0.0;
+    for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+        mass_sxyd += 2.0 * (real_num_mov)phi_sxyd[i] * (real_num_mov)phi_sxyd[j] * (real_num_mov)unknowns_local[6].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + i] +=
+        (real_num)((strain_xy_ud + mass_sxyd) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_ud; ++j) {
+        real_num_mov jac_sxydud = (real_num_mov)gradphi_sxyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 1] +
+                                 (real_num_mov)gradphi_sxyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + j)] += (real_num)(jac_sxydud * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+        real_num_mov jac_sxydsxyd = 2.0 * (real_num_mov)phi_sxyd[i] * (real_num_mov)phi_sxyd[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + j)] += (real_num)(jac_sxydsxyd * weight_qp);
+    }
+}
+
+// Test functions for R_syyd (eighth equation): ε_yy(ud) + s_yyd = 0
+for (unsigned i = 0; i < nDofs_syyd; ++i) {
+    // R_syyd = ∫(ε_yy(ud) + s_yyd)·v_syyd dΩ
+    real_num_mov strain_yy_ud = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_ud; ++j) {
+            strain_yy_ud += (real_num_mov)gradphi_syyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_syyd = 0.0;
+    for (unsigned j = 0; j < nDofs_syyd; ++j) {
+        mass_syyd += (real_num_mov)phi_syyd[i] * (real_num_mov)phi_syyd[j] * (real_num_mov)unknowns_local[7].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + i] +=
+        (real_num)((strain_yy_ud + mass_syyd) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_ud; ++j) {
+        real_num_mov jac_syydud = (real_num_mov)gradphi_syyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_ud[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + j)] += (real_num)(jac_syydud * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_syyd; ++j) {
+        real_num_mov jac_syydsyyd = (real_num_mov)phi_syyd[i] * (real_num_mov)phi_syyd[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + j)] += (real_num)(jac_syydsyyd * weight_qp);
+    }
+}
+
+
+
+// ------------------ 9. Equation for w (aResw) ------------------
+// AD: Bxxud (grad ud) + M_sxxd
+for (unsigned i = 0; i < nDofs_wsxxd; ++i) {
+    // R_sxxd = ∫(ε_xx(ud) + s_xxd)·v_sxxd dΩ
+    real_num_mov strain_wxx_ud = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_w; ++j) {
+            strain_wxx_ud += (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_wsxxd = 0.0;
+    for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
+        mass_wsxxd += (real_num_mov)phi_w[i] * (real_num_mov)phi_wsxxd[j] * (real_num_mov)unknowns_local[9].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i] +=
+        (real_num)((strain_wxx_ud + mass_wsxxd) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_wsxxdud = (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsxxdud * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
+        real_num_mov jac_wsxxdsxxd = (real_num_mov)phi_w[i] * (real_num_mov)phi_wsxxd[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + j)] += (real_num)(jac_wsxxdsxxd * weight_qp);
+    }
+}
+
+
+// ------------------ 10. Equation for wsxxd (aReswsxxd) ------------------
+// AD: Bxyud (grad ud) + M_sxyd
+for (unsigned i = 0; i < nDofs_wsxyd; ++i) {
+    // R_sxyd = ∫(2ε_xy(ud) + s_xyd)·v_sxyd dΩ
+    real_num_mov strain_wxy_ud = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_w; ++j) {
+            strain_wxy_ud += (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+            strain_wxy_ud += (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_wsxyd = 0.0;
+    for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+        mass_wsxyd += 2.0 * (real_num_mov)phi_wsxxd[i] * (real_num_mov)phi_wsxyd[j] * (real_num_mov)unknowns_local[10].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + i] +=
+        (real_num)((strain_wxy_ud + mass_wsxyd) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_wsxydud = (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1] +
+                                 (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsxydud * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+        real_num_mov jac_wsxydsxyd = 2.0 * (real_num_mov)phi_wsxxd[i] * (real_num_mov)phi_wsxyd[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + j)] += (real_num)(jac_wsxydsxyd * weight_qp);
+    }
+}
+
+
+// ------------------ 11. Equation for wsxyd (aReswsxyd) ------------------
+// AD: Byyud (grad ud) + M_syyd
+for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
+    // R_syyd = ∫(ε_yy(ud) + s_yyd)·v_syyd dΩ
+    real_num_mov strain_wyy_ud = 0.0;
+    if (dim == 2) {
+        for (unsigned j = 0; j < nDofs_w; ++j) {
+            strain_wyy_ud += (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+        }
+    }
+
+    real_num_mov mass_wsyyd = 0.0;
+    for (unsigned j = 0; j < nDofs_syyd; ++j) {
+        mass_wsyyd += (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_wsyyd[j] * (real_num_mov)unknowns_local[11].elem_dofs()[j];
+    }
+
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i] +=
+        (real_num)((strain_wyy_ud + mass_wsyyd) * weight_qp);
+
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_wsyydud = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + j)] += (real_num)(jac_wsyydud * weight_qp);
+    }
+
+    for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
+        real_num_mov jac_wsyydsyyd = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_wsyyd[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + j)] += (real_num)(jac_wsyydsyyd * weight_qp);
+    }
+}
+
+
+// ------------------ 12. Equation for wsyyd (aReswsyyd) ------------------
+// AD: M_w_comb = beta * w + gamma * Laplace_w    (weak form: beta*∫phi* w  - gamma*∫grad(phi)·grad(w))
+for (unsigned i = 0; i < nDofs_w; ++i) {
+    // R_q = ∫(ud + α·q)·v_q dΩ
+    real_num_mov mass_w = 0.0;
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        mass_w += (real_num_mov)phi_w[i] * (real_num_mov)phi_wsyyd[j] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+    }
+
+    // real_num_mov mass_q = 0.0;
+    // for (unsigned j = 0; j < nDofs_w; ++j) {
+    //     mass_w += beta * (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
     // }
 
-        Bxxu += phi_x[i * dim] * soluGauss_x[0] ;
+    unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i] +=
+        (real_num)((mass_w ) * weight_qp);
 
-        Bxyu +=  ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
-
-        Byyu +=  phi_x[i * dim + 1] * soluGauss_x[1];
-
-        Bxx += phi_x[i * dim] * solsxxGauss_x[0];
-
-        Bxy +=( (phi_x[i * dim + 1 ] * solsxyGauss_x[0] + phi_x[i * dim ] * solsxyGauss_x[1]) );
-        Byy +=  phi_x[i * dim + 1] * solsyyGauss_x[1];
-
-        Bxxud += phi_x[i * dim] * soludGauss_x[0] ;
-
-        Bxyud +=  ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
-
-        Byyud +=  phi_x[i * dim + 1] * soludGauss_x[1];
-
-        Bxxd += phi_x[i * dim] * solsxxdGauss_x[0] ;
-
-        Bxyd +=   ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1] * solsxydGauss_x[0] );
-
-        Byyd +=  phi_x[i * dim + 1] * solsyydGauss_x[1];
-
-        Bwxxu += phi_x[i * dim] * solwGauss_x[0] ;
-
-        Bwxyu +=  ( phi_x[i * dim] * solwGauss_x[1] + phi_x[i * dim + 1 ] * solwGauss_x[0] );
-
-        Bwyyu += phi_x[i * dim + 1] * solwGauss_x[1];
-
-        Bwxxud += phi_x[i * dim] * solwsxxdGauss_x[0] ;
-
-        Bwxyud +=  ( phi_x[i * dim] * solwsxydGauss_x[1] + phi_x[i * dim + 1 ] * solwsxydGauss_x[0] );
-
-        Bwyyud += phi_x[i * dim + 1] * solwsyydGauss_x[1];
-
-
-        adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
-
-        adept::adouble udr_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
-
-// // //         adept::adouble F_term_yd = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian_yd(xGauss) * phi[i];
-
-        // System residuals - signs adjusted to match matrix form
-     aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud) * weight;
-     aRessxx[i]   += (Bxxu + M_sxx ) * weight;
-     aRessxy[i]   += (Bxyu + M_sxy ) * weight;
-     aRessyy[i]    += (Byyu + M_syy ) * weight;
-     aResud[i]    += (Bwxxu + M_wsxxd) * weight;
-     aRessxxd[i]  += (Bwxyu + M_wsxyd) * weight;
-     aRessxyd[i]  += (Bwyyu + M_wsyyd) * weight;
-
-     aRessyyd[i]  += (M_u + Bxxd + Bxyd + Byyd + M_w - udr_term) * weight;
-
-     aResw[i]     += ( Bxxud + M_sxxd  ) * weight;
-     aReswsxxd[i] += (Bxyud + M_sxyd) * weight;
-     aReswsxyd[i] += (Byyud + M_syyd) * weight;
-     aReswsyyd[i] += (M_w_comb ) * weight;
-      } // end phi_i loop
-
-    } // end gauss point loop
-
-    // Add the local Matrix/Vector into the global Matrix/Vector
-
-    //copy the value of the adept::adoube aRes in double Res and store
-
-   Res.resize(12 * nDofs,0.0);
-
-    for (int i = 0; i < nDofs; i++) {
-      Res[i]               = -aResu[i].value();
-      Res[nDofs + i]       = -aRessxx[i].value();
-
-      Res[2 * nDofs + i  ] = -aRessxy[i].value(); // sxy
-      Res[3 * nDofs + i  ] = -aRessyy[i].value(); // syy
-      Res[4 * nDofs + i  ] = -aResud[i].value();
-      Res[5 * nDofs + i  ] = -aRessxxd[i].value();
-
-      Res[6 * nDofs + i  ] = -aRessxyd[i].value(); // sxy
-      Res[7 * nDofs + i  ] = -aRessyyd[i].value(); // syy
-
-      Res[8 * nDofs + i  ] = -aResw[i].value(); // syy
-      Res[9 * nDofs + i  ] = -aReswsxxd[i].value();
-
-      Res[10 * nDofs + i ] = -aReswsxyd[i].value(); // sxy
-      Res[11 * nDofs + i ] = -aReswsyyd[i].value(); // syy
+    // Jacobian contributions
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_wud = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j];
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd  + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wud * weight_qp);
     }
 
-    RES->add_vector_blocked(Res, sysDof);
-
-    Jac.resize(144 * nDofs * nDofs);
-
-    // define the independent variables
-    s.independent(&solu[0], nDofs);
-    s.independent(&solsxx[0], nDofs);
-
-    s.independent(&solsxy[0], nDofs);
-    s.independent(&solsyy[0], nDofs);
-    s.independent(&solud[0], nDofs);
-    s.independent(&solsxxd[0], nDofs);
-
-    s.independent(&solsxyd[0], nDofs);
-    s.independent(&solsyyd[0], nDofs);
-
-    s.independent(&solw[0], nDofs);
-    s.independent(&solwsxxd[0], nDofs);
-
-    s.independent(&solwsxyd[0], nDofs);
-    s.independent(&solwsyyd[0], nDofs);
-        // define the dependent variables
-    s.dependent(&aResu[0], nDofs);
-    s.dependent(&aRessxx[0], nDofs);
-    s.dependent(&aRessxy[0], nDofs);
-    s.dependent(&aRessyy[0], nDofs);
-    s.dependent(&aResud[0], nDofs);
-    s.dependent(&aRessxxd[0], nDofs);
-    s.dependent(&aRessxyd[0], nDofs);
-    s.dependent(&aRessyyd[0], nDofs);
-
-    s.dependent(&aResw[0], nDofs);
-    s.dependent(&aReswsxxd[0], nDofs);
-    s.dependent(&aReswsxyd[0], nDofs);
-    s.dependent(&aReswsyyd[0], nDofs);
-    // get the jacobian matrix (ordered by column)
-    s.jacobian(&Jac[0], true);
-
-    KK->add_matrix_blocked(Jac, sysDof, sysDof);
-
-         constexpr bool print_algebra_local = true;
-     if (print_algebra_local) {
-
-         assemble_jacobian<double,double>::print_element_jacobian(iel, Jac, Sol_n_el_dofs_Mat_vol, 10, 5);
-         assemble_jacobian<double,double>::print_element_residual(iel, Res, Sol_n_el_dofs_Mat_vol, 10, 5);
-
-     }
+    // for (unsigned j = 0; j < nDofs_w; ++j) {
+    //     real_num_mov jac_wqq = beta * (real_num_mov)phi_w[i] * (real_num_mov)phi_w[j];
+    //     unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wqq * weight_qp);
+    // }
+}
 
 
-    s.clear_independents();
-    s.clear_dependents();
-
-  } //end element loop for each process
-
-  RES->close();
-  KK->close();
 
 
+        } // end gauss loop
+
+        // Finalize local residual (FEMUS convention negative)
+        std::vector<double> Res_total(unk_element_jac_res.res().size());
+        for (size_t kk = 0; kk < unk_element_jac_res.res().size(); ++kk) {
+            Res_total[kk] = -(unk_element_jac_res.res()[kk]);
+        }
+
+        RES->add_vector_blocked(Res_total, unk_element_jac_res.dof_map());
+
+        if (assembleMatrix) {
+            KK->add_matrix_blocked(unk_element_jac_res.jac(), unk_element_jac_res.dof_map(), unk_element_jac_res.dof_map());
+        }
+
+        // Optional printing
+        constexpr bool print_algebra_local = true;
+        if (print_algebra_local) {
+            std::vector<unsigned> Sol_n_el_dofs_Mat_vol = unk_num_elem_dofs;
+            assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 12, 12);
+            assemble_jacobian<double,double>::print_element_residual(iel, Res_total, Sol_n_el_dofs_Mat_vol, 12, 12);
+        }
+
+    } // end element loop
+
+    RES->close();
+    if (assembleMatrix) KK->close();
 }
 
   };
-  
+
 }
 
 #endif

@@ -679,381 +679,227 @@ private:
 
 
 
-//====Set boundary condition-BEGIN==============================
+// Analytical function instances
+static Domains::square_m05p05::Function_Zero_on_boundary_7<> analytical_u;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx<> analytical_sxx;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy<> analytical_sxy;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy<> analytical_syy;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_d<> analytical_ud;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_sxxd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_sxyd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_syyd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w<> analytical_w;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_wsxxd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_wsxyd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_wsyyd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr<> source_function;
+
+// Boundary Conditions
 bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
-  bool dirichlet = true; //dirichlet
-
-  if (!strcmp(SolName, "u")) {
-      Math::Function <double> * u = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      // strcmp compares two string in lexiographic sense.
-    Value = u -> value(x);
-  }
-  else if (!strcmp(SolName, "sxx")) {
-      Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxx -> value(x);
-  }
-    else if (!strcmp(SolName, "sxy")) {
-      Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxy -> value(x);
-  }
-    else if (!strcmp(SolName, "syy")) {
-      Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = syy -> value(x);
-  }
-  else if (!strcmp(SolName, "ud")) {
-      Math::Function <double> * ud = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      // strcmp compares two string in lexiographic sense.
-    Value = ud -> value(x);
-  }
-  else if (!strcmp(SolName, "sxxd")) {
-      Math::Function <double> * sxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxxd -> value(x);
-  }
-    else if (!strcmp(SolName, "sxyd")) {
-      Math::Function <double> * sxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxyd -> value(x);
-  }
-    else if (!strcmp(SolName, "syyd")) {
-      Math::Function <double> * syyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = syyd -> value(x);
-  }
-    else if (!strcmp(SolName, "w")) {
-      Math::Function <double> * w = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = w -> value(x);
-  }
-    else if (!strcmp(SolName, "wsxxd")) {
-      Math::Function <double> * wsxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = wsxxd -> value(x);
-  }
-    else if (!strcmp(SolName, "wsxyd")) {
-      Math::Function <double> * wsxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = wsxyd -> value(x);
-  }
-    else if (!strcmp(SolName, "wsyyd")) {
-      Math::Function <double> * wsyyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = wsyyd -> value(x);
-  }
-  return dirichlet;
+    if (!strcmp(SolName, "u")) Value = analytical_u.value(x);
+    else if (!strcmp(SolName, "sxx")) Value = analytical_sxx.value(x);
+    else if (!strcmp(SolName, "sxy")) Value = analytical_sxy.value(x);
+    else if (!strcmp(SolName, "syy")) Value = analytical_syy.value(x);
+    else if (!strcmp(SolName, "ud")) Value = analytical_ud.value(x);
+    else if (!strcmp(SolName, "sxxd")) Value = analytical_sxxd.value(x);
+    else if (!strcmp(SolName, "sxyd")) Value = analytical_sxyd.value(x);
+    else if (!strcmp(SolName, "syyd")) Value = analytical_syyd.value(x);
+    else if (!strcmp(SolName, "w")) Value = analytical_w.value(x);
+    else if (!strcmp(SolName, "wsxxd")) Value = analytical_wsxxd.value(x);
+    else if (!strcmp(SolName, "wsxyd")) Value = analytical_wsxyd.value(x);
+    else if (!strcmp(SolName, "wsyyd")) Value = analytical_wsyyd.value(x);
+    return true;
 }
-//====Set boundary condition-END==============================
 
+// Initial Conditions
+double Solution_set_initial_conditions(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char * SolName) {
+    double value = 0.0;
+    if (!strcmp(SolName, "u")) value = analytical_u.value(x);
+    return value;
+}
 
+// Interface for Manual Assembly
+template < class system_type, class real_num, class real_num_mov >
+void System_assemble_interface_StressBased(MultiLevelProblem& ml_prob) {
+    const unsigned current_system_number = ml_prob.get_current_system_number();
+    std::vector< Unknown > unknowns = ml_prob.get_system< system_type >(current_system_number).get_unknown_list_for_assembly();
+    std::vector< Math::Function< double > * > source_funcs_for_assembly(1);
+    source_funcs_for_assembly[0] = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs;
 
+    std::vector < std::vector < elem_type_templ_base<real_num, real_num_mov> * > > elem_all;
+    ml_prob.get_all_abstract_fe(elem_all);
+    std::vector < std::vector < elem_type_templ_base<real_num_mov, real_num_mov> * > > elem_all_for_domain;
+    ml_prob.get_all_abstract_fe(elem_all_for_domain);
+
+    NAMESPACE_FOR_BIHARMONIC_HM::biharmonic_HM_oc_lifting_nonauto::AssembleBilaplaceProblem_AD(
+        elem_all, elem_all_for_domain, ml_prob.GetQuadratureRuleAllGeomElems(),
+        &ml_prob.get_system< system_type >(current_system_number),
+        ml_prob.GetMLMesh(), ml_prob.get_ml_solution(),
+        unknowns, source_funcs_for_assembly
+    );
+}
+
+// Solution Generation
+template < class real_num >
+class Solution_generation_StressBased : public Solution_generation_single_level {
+public:
+    const MultiLevelSolution run_on_single_level(
+        MultiLevelProblem & ml_prob,
+        MultiLevelMesh & ml_mesh_single_level,
+        const unsigned lev,
+        const std::vector< Unknown > & unknowns,
+        const std::vector< Math::Function< double > * > & exact_sol_functions,
+        const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
+        const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
+        const bool my_solution_generation_has_equation_solve
+    ) const {
+        unsigned numberOfUniformLevels = lev + 1;
+        ml_mesh_single_level.RefineMesh(numberOfUniformLevels, numberOfUniformLevels, NULL);
+        ml_mesh_single_level.EraseCoarseLevels(numberOfUniformLevels - 1);
+
+        MultiLevelSolution ml_sol_single_level(&ml_mesh_single_level);
+        ml_sol_single_level.SetWriter(VTK);
+        ml_prob.SetMultiLevelMeshAndSolution(&ml_sol_single_level);
+
+        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+            ml_sol_single_level.AddSolution(unknowns[u_idx]._name.c_str(), unknowns[u_idx]._fe_family, unknowns[u_idx]._fe_order, unknowns[u_idx]._time_order, unknowns[u_idx]._is_pde_unknown);
+            ml_sol_single_level.set_analytical_function(unknowns[u_idx]._name.c_str(), exact_sol_functions[u_idx]);
+            ml_sol_single_level.Initialize(unknowns[u_idx]._name.c_str(), SetInitialCondition_in, &ml_prob);
+        }
+
+        if (my_solution_generation_has_equation_solve) {
+            ml_prob.get_systems_map().clear();
+            ml_sol_single_level.AttachSetBoundaryConditionFunction(SetBoundaryCondition_in);
+            for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+                ml_sol_single_level.GenerateBdc(unknowns[u_idx]._name.c_str(), "Steady", &ml_prob);
+            }
+
+            LinearImplicitSystem& system = ml_prob.add_system< LinearImplicitSystem >("Biharmonic12");
+            for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) system.AddSolutionToSystemPDE(unknowns[u_idx]._name.c_str());
+            system.set_unknown_list_for_assembly(unknowns);
+            system.SetAssembleFunction(System_assemble_interface_StressBased< LinearImplicitSystem, real_num, double >);
+            ml_prob.set_current_system_number(0);
+            system.init();
+            system.SetOuterSolver(PREONLY);
+            system.MGsolve();
+        }
+
+        // Print output
+        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+            std::vector < std::string > variablesToBePrinted = {unknowns[u_idx]._name};
+            std::ostringstream output_filename;
+            output_filename << unknowns[u_idx]._name << "_stress_FE" << unknowns[u_idx]._fe_order << "_level" << lev;
+            ml_sol_single_level.GetWriter()->Write(output_filename.str(), ml_prob.GetFilesHandler()->GetOutputPath(), "biquadratic", variablesToBePrinted, lev);
+        }
+        return ml_sol_single_level;
+    }
+};
 
 int main(int argc, char** args) {
 
-  // init Petsc-MPI communicator
-  FemusInit mpinit(argc, args, MPI_COMM_WORLD);
-
-  // ======= Files - BEGIN  ========================
-  const bool use_output_time_folder = false; // This allows you to run the code multiple times without overwriting. This will generate an output folder each time you run.
-  const bool redirect_cout_to_file = false; // puts the output in a log file instead of the term
-  Files files;
-        files.CheckIODirectories(use_output_time_folder);
-        files.RedirectCout(redirect_cout_to_file);
-
-  // ======= Files - END  ========================
-
-
-    // ======= System Specifics - BEGIN  ==================
-  system_specifics  system_biharmonic_HM;   //me
-
-  // =========Mesh file - BEGIN ==================
-  system_biharmonic_HM._mesh_files.push_back("square_-0p5-0p5x-0p5-0p5_divisions_2x2.med");
-  const std::string relative_path_to_build_directory =  "../../../../../../";
-  const std::string mesh_file = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";  system_biharmonic_HM._mesh_files_path_relative_to_executable.push_back(mesh_file);
- // =========Mesh file - END ==================
-
-
-  system_biharmonic_HM._system_name = "Biharmonic";
-  system_biharmonic_HM._assemble_function = NAMESPACE_FOR_BIHARMONIC_HM :: biharmonic_HM_oc_lifting_nonauto :: AssembleBilaplaceProblem_AD;
-
-  system_biharmonic_HM._boundary_conditions_types_and_values             = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
-
-
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7 <>   system_biharmonic_HM_function_zero_on_boundary_1;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx  <>   system_biharmonic_HM_function_zero_on_boundary_sxx;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy  <>   system_biharmonic_HM_function_zero_on_boundary_sxy;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy <>   system_biharmonic_HM_function_zero_on_boundary_syy;
-
-    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd  <>   system_biharmonic_HM_function_zero_on_boundary_sxxd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd  <>   system_biharmonic_HM_function_zero_on_boundary_sxyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd <>   system_biharmonic_HM_function_zero_on_boundary_syyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_d <>   system_biharmonic_HM_function_zero_on_boundary_u_d;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr <>   system_biharmonic_HM_function_zero_on_boundary_u_dr;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w <>   system_biharmonic_HM_function_zero_on_boundary_w;
-
-    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd  <>   system_biharmonic_HM_function_zero_on_boundary_wsxxd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd  <>   system_biharmonic_HM_function_zero_on_boundary_wsxyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd <>   system_biharmonic_HM_function_zero_on_boundary_wsyyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian  <>   system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
-
-  // // Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_f<> Function_Zero_on_boundary_7_deviatoric_f;
-
-// // //   mlSol.set_analytical_function("f", &Function_Zero_on_boundary_7_deviatoric_f);
-
-
-
-
-  system_biharmonic_HM._assemble_function_for_rhs   = & system_biharmonic_HM_function_zero_on_boundary_u_dr;
-  system_biharmonic_HM._true_solution_function      = & system_biharmonic_HM_function_zero_on_boundary_1;
-
-
-
-
-  ///@todo if this is not set, nothing happens here. It is used to compute absolute errors
-    // ======= System Specifics - END ==================
-
-
-
-  // define multilevel mesh
-  MultiLevelMesh mlMsh;
-  // read coarse level mesh and generate finers level meshes
-  double scalingFactor = 1.;
-  const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
-  mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
-
-  unsigned maxNumberOfMeshes = 4;
-
-  std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
-
-  std::vector<std::vector<double>> l2Norm_u(maxNumberOfMeshes), semiNorm_u(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxx(maxNumberOfMeshes), semiNorm_sxx(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxy(maxNumberOfMeshes), semiNorm_sxy(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_syy(maxNumberOfMeshes), semiNorm_syy(maxNumberOfMeshes);
-
-  std::vector<std::vector<double>> l2Norm_ud(maxNumberOfMeshes), semiNorm_ud(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxxd(maxNumberOfMeshes), semiNorm_sxxd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxyd(maxNumberOfMeshes), semiNorm_sxyd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_syyd(maxNumberOfMeshes), semiNorm_syyd(maxNumberOfMeshes);
-
-  std::vector<std::vector<double>> l2Norm_w(maxNumberOfMeshes), semiNorm_w(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_wsxxd(maxNumberOfMeshes), semiNorm_wsxxd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_wsxyd(maxNumberOfMeshes), semiNorm_wsxyd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_wsyyd(maxNumberOfMeshes), semiNorm_wsyyd(maxNumberOfMeshes);
-
-
-  for (unsigned i = 0; i < maxNumberOfMeshes; i++) {
-    mlMsh.RefineMesh(i + 1, i + 1, nullptr);
-    mlMsh.EraseCoarseLevels(i);
-    mlMsh.PrintInfo();
-
-
-    l2Norm_u[i].resize(feOrder.size());   semiNorm_u[i].resize(feOrder.size());
-    l2Norm_sxx[i].resize(feOrder.size()); semiNorm_sxx[i].resize(feOrder.size());
-    l2Norm_sxy[i].resize(feOrder.size()); semiNorm_sxy[i].resize(feOrder.size());
-    l2Norm_syy[i].resize(feOrder.size()); semiNorm_syy[i].resize(feOrder.size());
-
-    l2Norm_ud[i].resize(feOrder.size());  semiNorm_ud[i].resize(feOrder.size());
-    l2Norm_sxxd[i].resize(feOrder.size());semiNorm_sxxd[i].resize(feOrder.size());
-    l2Norm_sxyd[i].resize(feOrder.size());semiNorm_sxyd[i].resize(feOrder.size());
-    l2Norm_syyd[i].resize(feOrder.size());semiNorm_syyd[i].resize(feOrder.size());
-
-    l2Norm_w[i].resize(feOrder.size());   semiNorm_w[i].resize(feOrder.size());
-    l2Norm_wsxxd[i].resize(feOrder.size());semiNorm_wsxxd[i].resize(feOrder.size());
-    l2Norm_wsxyd[i].resize(feOrder.size());semiNorm_wsxyd[i].resize(feOrder.size());
-    l2Norm_wsyyd[i].resize(feOrder.size());semiNorm_wsyyd[i].resize(feOrder.size());
-
-    for (unsigned j = 0; j < feOrder.size(); j++) {
-      MultiLevelSolution mlSol(&mlMsh);
-
-      mlSol.AddSolution("u", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("u", &system_biharmonic_HM_function_zero_on_boundary_1);
-
-      mlSol.AddSolution("sxx", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx);
-
-      mlSol.AddSolution("sxy", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy);
-
-      mlSol.AddSolution("syy", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("syy", &system_biharmonic_HM_function_zero_on_boundary_syy);
-
-      mlSol.AddSolution("ud", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("ud", &system_biharmonic_HM_function_zero_on_boundary_u_d);
-
-      mlSol.AddSolution("sxxd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxxd);
-
-      mlSol.AddSolution("sxyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxyd);
-
-      mlSol.AddSolution("syyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
-
-      mlSol.AddSolution("w", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("w", &system_biharmonic_HM_function_zero_on_boundary_w);
-
-      mlSol.AddSolution("wsxxd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("wsxxd", &system_biharmonic_HM_function_zero_on_boundary_wsxxd);
-
-      mlSol.AddSolution("wsxyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("wsxyd", &system_biharmonic_HM_function_zero_on_boundary_wsxyd);
-
-      mlSol.AddSolution("wsyyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("wsyyd", &system_biharmonic_HM_function_zero_on_boundary_wsyyd);
-
-      mlSol.Initialize("All");
-
-      MultiLevelProblem ml_prob(&mlSol);
-      ml_prob.set_app_specs_pointer(&system_biharmonic_HM);
-      ml_prob.SetFilesHandler(&files);
-
-      mlSol.AttachSetBoundaryConditionFunction(system_biharmonic_HM._boundary_conditions_types_and_values);
-      mlSol.GenerateBdc("u", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxx", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxy", "Steady", &ml_prob);
-      mlSol.GenerateBdc("syy", "Steady", &ml_prob);
-
-      mlSol.GenerateBdc("ud", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxxd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxyd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("syyd", "Steady", &ml_prob);
-
-
-      mlSol.GenerateBdc("w", "Steady", &ml_prob);
-      mlSol.GenerateBdc("wsxxd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("wsxyd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("wsyyd", "Steady", &ml_prob);
-
-      LinearImplicitSystem& system = ml_prob.add_system<LinearImplicitSystem>(system_biharmonic_HM._system_name);
-      system.AddSolutionToSystemPDE("u");
-      system.AddSolutionToSystemPDE("sxx");
-      system.AddSolutionToSystemPDE("sxy");
-      system.AddSolutionToSystemPDE("syy");
-
-      system.AddSolutionToSystemPDE("ud");
-      system.AddSolutionToSystemPDE("sxxd");
-      system.AddSolutionToSystemPDE("sxyd");
-      system.AddSolutionToSystemPDE("syyd");
-
-      system.AddSolutionToSystemPDE("w");
-      system.AddSolutionToSystemPDE("wsxxd");
-      system.AddSolutionToSystemPDE("wsxyd");
-      system.AddSolutionToSystemPDE("wsyyd");
-
-      system.SetAssembleFunction(system_biharmonic_HM._assemble_function);
-
-      system.init();
-      system.SetOuterSolver(PREONLY);
-
-      system.MGsolve();
-
-      std::pair<double, double> norm;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "u", &system_biharmonic_HM_function_zero_on_boundary_1);
-      l2Norm_u[i][j] = norm.first;
-      semiNorm_u[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx);
-      l2Norm_sxx[i][j] = norm.first;
-      semiNorm_sxx[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy);
-      l2Norm_sxy[i][j] = norm.first;
-      semiNorm_sxy[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "syy", &system_biharmonic_HM_function_zero_on_boundary_syy);
-      l2Norm_syy[i][j] = norm.first;
-      semiNorm_syy[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "ud", &system_biharmonic_HM_function_zero_on_boundary_u_d);
-      l2Norm_ud[i][j] = norm.first;
-      semiNorm_ud[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxxd);
-      l2Norm_sxxd[i][j] = norm.first;
-      semiNorm_sxxd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxyd);
-      l2Norm_sxyd[i][j] = norm.first;
-      semiNorm_sxyd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
-      l2Norm_syyd[i][j] = norm.first;
-      semiNorm_syyd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "w", &system_biharmonic_HM_function_zero_on_boundary_w);
-      l2Norm_w[i][j] = norm.first;
-      semiNorm_w[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsxxd", &system_biharmonic_HM_function_zero_on_boundary_wsxxd);
-      l2Norm_wsxxd[i][j] = norm.first;
-      semiNorm_wsxxd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsxyd", &system_biharmonic_HM_function_zero_on_boundary_wsxyd);
-      l2Norm_wsxyd[i][j] = norm.first;
-      semiNorm_wsxyd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsyyd", &system_biharmonic_HM_function_zero_on_boundary_wsyyd);
-      l2Norm_wsyyd[i][j] = norm.first;
-      semiNorm_wsyyd[i][j] = norm.second;
-
-
-      VTKWriter vtkIO(&mlSol);
-      vtkIO.Write("test", Files::_application_output_directory, "biquadratic", {"All"}, i);
+    // ======= Init ==========================
+    FemusInit mpinit(argc, args, MPI_COMM_WORLD);
+
+    // ======= Problem ========================
+    MultiLevelProblem ml_prob;
+
+    // ======= Files - BEGIN =========================
+    Files files;
+    const bool use_output_time_folder = false;
+    const bool redirect_cout_to_file = false;
+    files.CheckIODirectories(use_output_time_folder);
+    files.RedirectCout(redirect_cout_to_file);
+    ml_prob.SetFilesHandler(&files);
+    // ======= Files - END =========================
+
+    // ======= Mesh, Coarse, file - BEGIN ========================
+    MultiLevelMesh ml_mesh;
+    const std::string relative_path_to_build_directory = "../../../../../../";
+    const std::string input_file_path = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";
+    const std::string input_mesh_filename = "square_-0p5-0p5x-0p5-0p5_divisions_2x2.med";
+    const std::string input_file_total = input_file_path + input_mesh_filename;
+
+    ml_mesh.ReadCoarseMesh(input_file_total);
+    // ======= Mesh, Coarse, file - END ========================
+
+    // ======= Quad Rule - BEGIN ========================
+    std::string fe_quad_rule("seventh");
+    ml_prob.SetQuadratureRuleAllGeomElems(fe_quad_rule);
+    ml_prob.set_all_abstract_fe_AD_or_not();
+    // ======= Quad Rule - END ========================
+
+    // ======= Convergence study setup - BEGIN ========================
+    unsigned max_number_of_meshes = 4;
+
+    // Auxiliary mesh for incremental refinement
+    MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
+    ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(input_file_total);
+
+    // Solution generation class
+    Solution_generation_StressBased< double > my_solution_generation;
+
+    const bool my_solution_generation_has_equation_solve = true;
+
+    // ======= Unknowns - BEGIN ========================
+    std::vector< Unknown > unknowns(12); // Twelve unknowns
+    std::vector<std::string> unknown_names = {
+        "u", "sxx", "sxy", "syy",
+        "ud", "sxxd", "sxyd", "syyd",
+        "w", "wsxxd", "wsxyd", "wsyyd"
+    };
+    std::vector<Math::Function<double>*> analytical_functions = {
+        &analytical_u, &analytical_sxx, &analytical_sxy, &analytical_syy,
+        &analytical_ud, &analytical_sxxd, &analytical_sxyd, &analytical_syyd,
+        &analytical_w, &analytical_wsxxd, &analytical_wsxyd, &analytical_wsyyd
+    };
+
+    for (unsigned u_idx = 0; u_idx < 12; u_idx++) {
+        unknowns[u_idx]._name = unknown_names[u_idx];
+        unknowns[u_idx]._fe_family = LAGRANGE;
+        unknowns[u_idx]._fe_order = FIRST; // Can be varied in convergence study
+        unknowns[u_idx]._time_order = 0;
+        unknowns[u_idx]._is_pde_unknown = true;
     }
-  }
-  // ======= Convergence study, mesh loop and FE loop - END =========================
+    // ======= Unknowns - END ========================
 
-
-  // ======= Convergence study, print convergence rate - BEGIN =========================
-  auto print_error = [](const std::vector<std::vector<double>>& error, const std::string& title) {
-    std::cout << "\n" << title << "\nLEVEL\tFIRST\t\t\tSERENDIPITY\t\tSECOND\n";
-    for (unsigned i = 0; i < error.size(); ++i) {
-      std::cout << i + 1 << "\t";
-      for (auto val : error[i]) std::cout << val << "\t";
-      std::cout << "\n";
-      if (i < error.size() - 1) {
-        std::cout << "\t\t";
-        for (unsigned j = 0; j < error[i].size(); ++j) {
-          std::cout << log(error[i][j] / error[i + 1][j]) / log(2.) << "\t\t\t";
-        }
-        std::cout << "\n";
-      }
+    // ======= Unknowns, Analytical functions - BEGIN ================
+    std::vector< Math::Function< double > * > unknowns_analytical_functions_Needed_for_absolute(unknowns.size());
+    for (unsigned u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+        unknowns_analytical_functions_Needed_for_absolute[u_idx] = analytical_functions[u_idx];
     }
-  };
+    // ======= Unknowns, Analytical functions - END ================
 
-  print_error(l2Norm_u, "L2 ERROR for u");
-  print_error(semiNorm_u, "H1 ERROR for u");
-  print_error(l2Norm_sxx, "L2 ERROR for sxx");
-  print_error(semiNorm_sxx, "H1 ERROR for sxx");
-  print_error(l2Norm_sxy, "L2 ERROR for sxy");
-  print_error(semiNorm_sxy, "H1 ERROR for sxy");
-  print_error(l2Norm_syy, "L2 ERROR for syy");
-  print_error(semiNorm_syy, "H1 ERROR for syy");
+    // ======= System Specifics for Stress-Based Problem - BEGIN ==================
+    system_specifics app_specs;
+    app_specs._system_name = "Biharmonic12";
+    app_specs._assemble_function = System_assemble_interface_StressBased<LinearImplicitSystem, double, double>;
+    app_specs._assemble_function_for_rhs = &source_function;
+    app_specs._true_solution_function = &analytical_u;
+    app_specs._boundary_conditions_types_and_values = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
+    ml_prob.set_app_specs_pointer(&app_specs);
+    // ======= System Specifics for Stress-Based Problem - END ==================
 
-  print_error(l2Norm_ud, "L2 ERROR for ud");
-  print_error(semiNorm_ud, "H1 ERROR for ud");
-  print_error(l2Norm_sxxd, "L2 ERROR for sxxd");
-  print_error(semiNorm_sxxd, "H1 ERROR for sxxd");
-  print_error(l2Norm_sxyd, "L2 ERROR for sxyd");
-  print_error(semiNorm_sxyd, "H1 ERROR for sxyd");
-  print_error(l2Norm_syyd, "L2 ERROR for syyd");
-  print_error(semiNorm_syyd, "H1 ERROR for syyd");
+    // Various choices for convergence study
+    std::vector < bool > convergence_rate_computation_method_Flag = {true, true};
+    std::vector < bool > volume_or_boundary_Flag = {true, true};
+    std::vector < bool > sobolev_norms_Flag = {true, true};
 
-  print_error(l2Norm_w, "L2 ERROR for w");
-  print_error(semiNorm_w, "H1 ERROR for w");
-  print_error(l2Norm_wsxxd, "L2 ERROR for wsxxd");
-  print_error(semiNorm_wsxxd, "H1 ERROR for wsxxd");
-  print_error(l2Norm_wsxyd, "L2 ERROR for wsxyd");
-  print_error(semiNorm_wsxyd, "H1 ERROR for wsxyd");
-  print_error(l2Norm_wsyyd, "L2 ERROR for wsyyd");
-  print_error(semiNorm_wsyyd, "H1 ERROR for wsyyd");
+    // ======= Perform Convergence Study ========================
+    FE_convergence<>::convergence_study(
+        ml_prob,
+        ml_mesh,
+        &ml_mesh_all_levels_Needed_for_incremental,
+        max_number_of_meshes,
+        convergence_rate_computation_method_Flag,
+        volume_or_boundary_Flag,
+        sobolev_norms_Flag,
+        my_solution_generation_has_equation_solve,
+        my_solution_generation,
+        unknowns,
+        unknowns_analytical_functions_Needed_for_absolute,
+        Solution_set_initial_conditions,
+        SetBoundaryCondition_bc_all_dirichlet_homogeneous
+    );
 
-  return 0;
+    return 0;
 }
-
-
