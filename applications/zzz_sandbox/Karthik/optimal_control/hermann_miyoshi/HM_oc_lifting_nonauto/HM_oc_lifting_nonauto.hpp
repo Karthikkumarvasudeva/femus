@@ -1560,12 +1560,12 @@ for (unsigned i = 0; i < nDofs_wsxxd; ++i) {
     // Jacobian contributions
     for (unsigned j = 0; j < nDofs_w; ++j) {
         real_num_mov jac_wsxxdud = (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
-        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsxxdud * weight_qp);
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsxxdud * weight_qp);
     }
 
     for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
         real_num_mov jac_wsxxdsxxd = (real_num_mov)phi_w[i] * (real_num_mov)phi_wsxxd[j];
-        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + j)] += (real_num)(jac_wsxxdsxxd * weight_qp);
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + j)] += (real_num)(jac_wsxxdsxxd * weight_qp);
     }
 }
 
@@ -1626,7 +1626,7 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
     // Jacobian contributions
     for (unsigned j = 0; j < nDofs_w; ++j) {
         real_num_mov jac_wsyydud = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
-        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + j)] += (real_num)(jac_wsyydud * weight_qp);
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsyydud * weight_qp);
     }
 
     for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
