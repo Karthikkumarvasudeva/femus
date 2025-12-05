@@ -671,6 +671,31 @@ private:
 
 };
 
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_zero : public Math::Function<type> {
+
+public:
+    type value(const std::vector<type>& x) const {
+        return 0.; // 4096π⁸ = (8π²)⁴
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        solGrad[0] = 0.;
+        solGrad[1] = 0.;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        return 0.;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+//     static constexpr double a = 0.001;
+
+};
+
 
 }
 
@@ -790,13 +815,13 @@ int main(int argc, char** args) {
 
   Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr <>   system_biharmonic_HM_function_zero_on_boundary_u_dr;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w <>   system_biharmonic_HM_function_zero_on_boundary_w;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr <>   system_biharmonic_HM_function_zero_on_boundary_w;
 
-    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd  <>   system_biharmonic_HM_function_zero_on_boundary_wsxxd;
+    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_zero  <>   system_biharmonic_HM_function_zero_on_boundary_wsxxd;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd  <>   system_biharmonic_HM_function_zero_on_boundary_wsxyd;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_zero  <>   system_biharmonic_HM_function_zero_on_boundary_wsxyd;
 
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd <>   system_biharmonic_HM_function_zero_on_boundary_wsyyd;
+  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_zero <>   system_biharmonic_HM_function_zero_on_boundary_wsyyd;
 
   Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian  <>   system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
 
