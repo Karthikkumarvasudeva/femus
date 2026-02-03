@@ -1424,14 +1424,27 @@ double gamma = 0.01;
         Bwyyud += phi_x[i * dim + 1] * solwsyydGauss_x[1];
 
 
-        adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
-
         adept::adouble udr_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
+
+
+                  adept::adouble f_u_val = 0.0;
+{
+    const double pi = 3.14159265358979323846;
+    const adept::adouble x = xGauss[0];
+    const adept::adouble y = xGauss[1];
+
+    // Define the exact solution: u_e = cos(pi*x) * cos(pi*y)
+    const adept::adouble u_e = cos(pi * x) * cos(pi * y);
+
+    // Define the RHS load term: f_u = Delta^2 u_e = 4 * pi^4 * u_e
+    const adept::adouble pi4 = pi * pi * pi * pi;
+    f_u_val = 4.0 * pi4 * u_e;
+}
 
 // // //         adept::adouble F_term_yd = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian_yd(xGauss) * phi[i];
 
         // System residuals - signs adjusted to match matrix form
-     aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud) * weight;
+     aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud + f_u_val) * weight;
      aRessxx[i]   += (Bxxu + M_sxx ) * weight;
      aRessxy[i]   += (Bxyu + M_sxy ) * weight;
      aRessyy[i]    += (Byyu + M_syy ) * weight;
@@ -1514,7 +1527,7 @@ double gamma = 0.01;
 
     KK->add_matrix_blocked(Jac, sysDof, sysDof);
 
-         constexpr bool print_algebra_local = true;
+         constexpr bool print_algebra_local = false;
      if (print_algebra_local) {
 
          assemble_jacobian<double,double>::print_element_jacobian(iel, Jac, Sol_n_el_dofs_Mat_vol, 10, 5);

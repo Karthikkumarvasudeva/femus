@@ -907,7 +907,7 @@ static void AssembleBilaplaceProblem_AD(
      MultiLevelSolution * ml_sol_in,
      const std::vector< Unknown > &  unknowns,
      const std::vector< Math::Function< double > * > & source_functions) {
-
+  // // // const std::vector< Math::Function< double > * > & analytical_u;
     // level is the level of the PDE system to be assembled
     const unsigned level = mlPdeSys->GetLevelToAssemble();
     const bool assembleMatrix = mlPdeSys->GetAssembleMatrix();
@@ -927,7 +927,7 @@ static void AssembleBilaplaceProblem_AD(
     if (assembleMatrix) KK->zero();
 
     // Physics Constants
-    const double beta = 0.01;
+    const double beta = 0.0001;
     const double gamma = 0.01;
     // const double nu = 0.0; // Poisson ratio unused in provided AD code
 
@@ -1200,12 +1200,26 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
                 }
             }
 
-                        const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss); // udr_term
-
 
 
             // ==================== RESIDUALS & JACOBIANS ====================
 
+           real_num_mov f_u_val = 0.0;
+{
+    const double pi = 3.14159265358979323846;
+    const real_num_mov x = x_gss[0];
+    const real_num_mov y = x_gss[1];
+
+    // Define the exact solution: u_e = cos(pi*x) * cos(pi*y)
+    const real_num_mov u_e = cos(pi * x) * cos(pi * y);
+
+    // Define the RHS load term: f_u = Delta^2 u_e = 4 * pi^4 * u_e
+    const real_num_mov pi4 = pi * pi * pi * pi;
+    f_u_val = 4.0 * pi4 * u_e;
+}
+
+
+ // // // const real_num_mov f_u_val = (real_num_mov) source_functions[0]->laplacian(x_gss); // udr_term
             // --- 1. Equation for u (aResu) ---
             // AD: Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud
             for (unsigned i = 0; i < nDofs_u; ++i) {
@@ -1248,7 +1262,7 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
             div_sigma_w += (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[11].elem_dofs()[j];
         }
 
-                unk_element_jac_res.res()[i] += (div_sigma + div_sigma_w) * weight_qp;
+                unk_element_jac_res.res()[i] += (div_sigma + div_sigma_w + f_u_val) * weight_qp;
 
                 // Jacobian blocks - Fixed indexing issues
     // Jacobian contributions
@@ -1376,7 +1390,7 @@ for (unsigned i = 0; i < nDofs_syy; ++i) {
         unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + j)] += (real_num)(jac_syysyy * weight_qp);
     }
 }
-
+                        const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss); // udr_term
 // --- 5. Equation for ud ---
 for (unsigned i = 0; i < nDofs_ud; ++i) {
     // R_ud = ∫(u + ∂σ_xxd/∂x + ∂σ_xyd/∂y + ∂σ_xyd/∂x + ∂σ_yyd/∂y + f)·v_ud dΩ
@@ -1413,7 +1427,7 @@ for (unsigned i = 0; i < nDofs_ud; ++i) {
     real_num_mov source_term = f_val * (real_num_mov)phi_ud[i];
 
     unk_element_jac_res.res()[nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i] +=
-        (real_num)((mass_u + div_sigmad + mass_w) * weight_qp);
+        (real_num)((mass_u + div_sigmad + mass_w - source_term) * weight_qp);
 
     // Jacobian contributions
     for (unsigned j = 0; j < nDofs_u; ++j) {
@@ -1560,12 +1574,12 @@ for (unsigned i = 0; i < nDofs_wsxxd; ++i) {
     // Jacobian contributions
     for (unsigned j = 0; j < nDofs_w; ++j) {
         real_num_mov jac_wsxxdud = (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
-        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsxxdud * weight_qp);
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsxxdud * weight_qp);
     }
 
     for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
         real_num_mov jac_wsxxdsxxd = (real_num_mov)phi_w[i] * (real_num_mov)phi_wsxxd[j];
-        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + j)] += (real_num)(jac_wsxxdsxxd * weight_qp);
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + j)] += (real_num)(jac_wsxxdsxxd * weight_qp);
     }
 }
 
@@ -1626,7 +1640,7 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
     // Jacobian contributions
     for (unsigned j = 0; j < nDofs_w; ++j) {
         real_num_mov jac_wsyydud = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
-        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + j)] += (real_num)(jac_wsyydud * weight_qp);
+        unk_element_jac_res.jac()[(nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd + i) * total_local_dofs + (nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + j)] += (real_num)(jac_wsyydud * weight_qp);
     }
 
     for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
@@ -1642,7 +1656,7 @@ for (unsigned i = 0; i < nDofs_w; ++i) {
     // R_q = ∫(ud + α·q)·v_q dΩ
     real_num_mov mass_w = 0.0;
     for (unsigned j = 0; j < nDofs_w; ++j) {
-        mass_w += (real_num_mov)phi_w[i] * (real_num_mov)phi_wsyyd[j] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+        mass_w += beta * (real_num_mov)phi_w[i] * (real_num_mov)phi_wsyyd[j] * (real_num_mov)unknowns_local[8].elem_dofs()[j];
     }
 
     // real_num_mov mass_q = 0.0;
@@ -1683,7 +1697,7 @@ for (unsigned i = 0; i < nDofs_w; ++i) {
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = true;
+        constexpr bool print_algebra_local = false;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = unk_num_elem_dofs;
             assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 12, 12);
