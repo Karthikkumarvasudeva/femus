@@ -1168,7 +1168,7 @@ double nu2 = 2.0 / (1.0 + nu);
 
         }
 
-        double pi = acos(-1.);
+// // //         double pi = acos(-1.);
 
     adept::adouble Bxxu = 0.;
     adept::adouble Bxyu = 0.;
@@ -1189,7 +1189,21 @@ double nu2 = 2.0 / (1.0 + nu);
 
 
 // // //     }
-        adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian(xGauss) * phi[i];
+
+// // //         adept::adouble F_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian(xGauss) * phi[i];
+
+
+        static constexpr double pi = acos(-1.);
+
+        adept::adouble x = xGauss[0];
+        adept::adouble y = xGauss[1];
+
+// RHS = -Δu = 2π² sin(πx) sin(πy)
+        adept::adouble f = -64.0 * pi * pi * pi * pi * (cos(4.0 * pi * x) - 2.0 * cos(4.0 * pi * (x - y))
+            + cos(4.0 * pi * y) - 2.0 * cos(4.0 * pi * (x + y)));
+
+        adept::adouble F_term = f * phi[i];
+
 
         // System residuals - signs adjusted to match matrix form
      aResu[i] += ( Bxxsxx + Bxysxy + Byysyy + F_term ) * weight;
