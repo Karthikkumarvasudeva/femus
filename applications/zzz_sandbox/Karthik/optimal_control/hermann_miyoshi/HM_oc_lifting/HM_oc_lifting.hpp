@@ -1397,6 +1397,7 @@ double gamma = 0.01;
         Bxx += phi_x[i * dim] * solsxxGauss_x[0];
 
         Bxy +=( (phi_x[i * dim + 1 ] * solsxyGauss_x[0] + phi_x[i * dim ] * solsxyGauss_x[1]) );
+
         Byy +=  phi_x[i * dim + 1] * solsyyGauss_x[1];
 
         Bxxud += phi_x[i * dim] * soludGauss_x[0] ;
@@ -1429,7 +1430,7 @@ double gamma = 0.01;
 
                   adept::adouble f_u_val = 0.0;
 {
-    const double pi = 3.14159265358979323846;
+    static constexpr double pi = acos(-1.);
     const adept::adouble x = xGauss[0];
     const adept::adouble y = xGauss[1];
 
@@ -1438,7 +1439,7 @@ double gamma = 0.01;
 
     // Define the RHS load term: f_u = Delta^2 u_e = 4 * pi^4 * u_e
     const adept::adouble pi4 = pi * pi * pi * pi;
-    f_u_val = 4.0 * pi4 * u_e;
+    f_u_val =4. * pi * pi * pi * pi * (cos(pi * x) * cos(pi * y));;
 }
 
 // // //         adept::adouble F_term_yd = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian_yd(xGauss) * phi[i];
