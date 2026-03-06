@@ -1331,7 +1331,7 @@ double gamma = 0.01;
           Laplace_wsxyd   +=  - phi_x[i * dim + jdim] * solwsxydGauss_x[jdim];
           Laplace_wsyyd   +=  - phi_x[i * dim + jdim] * solwsyydGauss_x[jdim];
         }
-        adept::adouble M_w_comb = beta * phi[i] * solwGauss + gamma * Laplace_w;
+        adept::adouble M_w_comb = M_w + beta * phi[i] * solwGauss + gamma * Laplace_w;
         double pi = acos(-1.);
 
     adept::adouble Bxxu = 0.;
@@ -1448,17 +1448,17 @@ double gamma = 0.01;
      aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud + f_u_val) * weight;
      aRessxx[i]   += (Bxxu + M_sxx ) * weight;
      aRessxy[i]   += (Bxyu + M_sxy ) * weight;
-     aRessyy[i]    += (Byyu + M_syy ) * weight;
-     aResud[i]    += (Bwxxu + M_wsxxd) * weight;
-     aRessxxd[i]  += (Bwxyu + M_wsxyd) * weight;
-     aRessxyd[i]  += (Bwyyu + M_wsyyd) * weight;
+     aRessyy[i]   += (Byyu + M_syy ) * weight;
 
-     aRessyyd[i]  += (M_u + Bxxd + Bxyd + Byyd + M_w - udr_term) * weight;
+     aResud[i]    += (M_u + Bxxd + Bxyd + Byyd + M_w - udr_term) * weight;
+     aRessxxd[i]  += (Bxxud + M_sxxd) * weight;
+     aRessxyd[i]  += (Bxyud + M_sxyd) * weight;
+     aRessyyd[i]  += (Byyud + M_syyd) * weight;
 
-     aResw[i]     += ( Bxxud + M_sxxd  ) * weight;
-     aReswsxxd[i] += (Bxyud + M_sxyd) * weight;
-     aReswsxyd[i] += (Byyud + M_syyd) * weight;
-     aReswsyyd[i] += (M_w_comb ) * weight;
+     aResw[i]     += (Bwxxu + M_wsxxd  ) * weight;
+     aReswsxxd[i] += (Bwxyu + M_wsxyd) * weight;
+     aReswsxyd[i] += (Bwyyu + M_wsyyd) * weight;
+     aReswsyyd[i] += (M_u + Bxxd + Bxyd + Byyd + M_w_comb - udr_term) * weight;
       } // end phi_i loop
 
     } // end gauss point loop
@@ -1528,7 +1528,7 @@ double gamma = 0.01;
 
     KK->add_matrix_blocked(Jac, sysDof, sysDof);
 
-         constexpr bool print_algebra_local = false;
+         constexpr bool print_algebra_local = true;
      if (print_algebra_local) {
 
          assemble_jacobian<double,double>::print_element_jacobian(iel, Jac, Sol_n_el_dofs_Mat_vol, 10, 5);
