@@ -680,43 +680,83 @@ private:
 
 
 // Analytical function instances
-static Domains::square_m05p05::Function_Zero_on_boundary_7<> analytical_u;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx<> analytical_sxx;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy<> analytical_sxy;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy<> analytical_syy;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_d<> analytical_ud;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_sxxd;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_sxyd;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_syyd;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w<> analytical_w;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_wsxxd;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_wsxyd;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_wsyyd;
+static Domains::square_m05p05::Function_Zero_on_boundary_7<> analytical_u_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx<> analytical_sxx_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy<> analytical_sxy_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy<> analytical_syy_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_d<> analytical_ud_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_sxxd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_sxyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_syyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w<> analytical_w_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_wsxxd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_wsxyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_wsyyd_solution;
 static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr<> source_function;
 
-// Boundary Conditions
-bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
-    if (!strcmp(SolName, "u")) Value = analytical_u.value(x);
-    else if (!strcmp(SolName, "sxx")) Value = analytical_sxx.value(x);
-    else if (!strcmp(SolName, "sxy")) Value = analytical_sxy.value(x);
-    else if (!strcmp(SolName, "syy")) Value = analytical_syy.value(x);
-    else if (!strcmp(SolName, "ud")) Value = analytical_ud.value(x);
-    else if (!strcmp(SolName, "sxxd")) Value = analytical_sxxd.value(x);
-    else if (!strcmp(SolName, "sxyd")) Value = analytical_sxyd.value(x);
-    else if (!strcmp(SolName, "syyd")) Value = analytical_syyd.value(x);
-    else if (!strcmp(SolName, "w")) Value = analytical_w.value(x);
-    else if (!strcmp(SolName, "wsxxd")) Value = analytical_wsxxd.value(x);
-    else if (!strcmp(SolName, "wsxyd")) Value = analytical_wsxyd.value(x);
-    else if (!strcmp(SolName, "wsyyd")) Value = analytical_wsyyd.value(x);
-    return true;
-}
 
 // Initial Conditions
 double Solution_set_initial_conditions(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char * SolName) {
     double value = 0.0;
-    if (!strcmp(SolName, "u")) value = analytical_u.value(x);
+     if (!strcmp(SolName, "u")) {
+        value = analytical_u_solution.value(x);
+    } else if (!strcmp(SolName, "sxx")) {
+        value = analytical_sxx_solution.value(x);
+    } else if (!strcmp(SolName, "sxy")) {
+        value = analytical_sxy_solution.value(x);
+    } else if (!strcmp(SolName, "syy")) {
+        value = analytical_syy_solution.value(x);
+    } else if (!strcmp(SolName, "ud")) {
+        value = analytical_ud_solution.value(x);
+    } else if (!strcmp(SolName, "sxxd")) {
+        value = analytical_sxxd_solution.value(x);
+    } else if (!strcmp(SolName, "sxyd")) {
+        value = analytical_sxyd_solution.value(x);
+    } else if (!strcmp(SolName, "syyd")) {
+        value = analytical_syyd_solution.value(x);
+    } else if (!strcmp(SolName, "w")) {
+        value = analytical_w_solution.value(x);
+    } else if (!strcmp(SolName, "wsxxd")) {
+        value = analytical_wsxxd_solution.value(x);
+    } else if (!strcmp(SolName, "wsxyd")) {
+        value = analytical_wsxyd_solution.value(x);
+    } else if (!strcmp(SolName, "wsyyd")) {
+        value = analytical_wsyyd_solution.value(x);
+    }
     return value;
 }
+
+// Boundary Conditions
+bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
+    if (!strcmp(SolName, "u")) {
+        Value = analytical_u_solution.value(x);
+    } else if (!strcmp(SolName, "sxx")) {
+        Value = analytical_sxx_solution.value(x);
+    } else if (!strcmp(SolName, "sxy")) {
+        Value = analytical_sxy_solution.value(x);
+    } else if (!strcmp(SolName, "syy")) {
+        Value = analytical_syy_solution.value(x);
+    } else if (!strcmp(SolName, "ud")) {
+        Value = analytical_ud_solution.value(x);
+    } else if (!strcmp(SolName, "sxxd")) {
+        Value = analytical_sxxd_solution.value(x);
+    } else if (!strcmp(SolName, "sxyd")) {
+        Value = analytical_sxyd_solution.value(x);
+    } else if (!strcmp(SolName, "syyd")) {
+        Value = analytical_syyd_solution.value(x);
+    } else if (!strcmp(SolName, "w")) {
+        Value = analytical_w_solution.value(x);
+    } else if (!strcmp(SolName, "wsxxd")) {
+        Value = analytical_wsxxd_solution.value(x);
+    } else if (!strcmp(SolName, "wsxyd")) {
+        Value = analytical_wsxyd_solution.value(x);
+    } else if (!strcmp(SolName, "wsyyd")) {
+        Value = analytical_wsyyd_solution.value(x);
+    }
+    return true;
+}
+
+
 
 // Interface for Manual Assembly
 template < class system_type, class real_num, class real_num_mov >
@@ -752,13 +792,36 @@ public:
         const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
         const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
         const bool my_solution_generation_has_equation_solve
-    ) const {
+    ) const;
+};
+
+
+template < class real_num >
+const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_single_level(
+    MultiLevelProblem & ml_prob,
+    MultiLevelMesh & ml_mesh_single_level,
+    const unsigned lev,
+    const std::vector< Unknown > & unknowns,
+    const std::vector< Math::Function< double > * > & exact_sol_functions,
+    const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
+    const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
+    const bool my_solution_generation_has_equation_solve
+) const{
         unsigned numberOfUniformLevels = lev + 1;
         ml_mesh_single_level.RefineMesh(numberOfUniformLevels, numberOfUniformLevels, NULL);
         ml_mesh_single_level.EraseCoarseLevels(numberOfUniformLevels - 1);
+        ml_mesh_single_level.PrintInfo();
+
+            if (ml_mesh_single_level.GetNumberOfLevels() != 1) {
+        std::cout << "Need single level here" << std::endl;
+        abort();
+    }
 
         MultiLevelSolution ml_sol_single_level(&ml_mesh_single_level);
         ml_sol_single_level.SetWriter(VTK);
+        ml_sol_single_level.GetWriter()->SetDebugOutput(true);
+
+
         ml_prob.SetMultiLevelMeshAndSolution(&ml_sol_single_level);
 
         for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
@@ -769,20 +832,33 @@ public:
 
         if (my_solution_generation_has_equation_solve) {
             ml_prob.get_systems_map().clear();
+
+
             ml_sol_single_level.AttachSetBoundaryConditionFunction(SetBoundaryCondition_in);
             for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
-                ml_sol_single_level.GenerateBdc(unknowns[u_idx]._name.c_str(), "Steady", &ml_prob);
+                ml_sol_single_level.GenerateBdc(unknowns[u_idx]._name.c_str(), (unknowns[u_idx]._time_order == 0) ? "Steady" : "Time_dependent", &ml_prob);
             }
 
             LinearImplicitSystem& system = ml_prob.add_system< LinearImplicitSystem >("Biharmonic12");
-            for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) system.AddSolutionToSystemPDE(unknowns[u_idx]._name.c_str());
+
+
+            for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++){
+                system.AddSolutionToSystemPDE(unknowns[u_idx]._name.c_str());
+            }
             system.set_unknown_list_for_assembly(unknowns);
             system.SetAssembleFunction(System_assemble_interface_StressBased< LinearImplicitSystem, real_num, double >);
+
             ml_prob.set_current_system_number(0);
             system.init();
+                    system.ClearVariablesToBeSolved();
+        system.AddVariableToBeSolved("All");
             system.SetOuterSolver(PREONLY);
             system.MGsolve();
         }
+
+            // Print Solutions to VTK
+    ml_sol_single_level.SetWriter(VTK);
+    ml_sol_single_level.GetWriter()->SetDebugOutput(true);
 
         // Print output
         for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
@@ -793,7 +869,7 @@ public:
         }
         return ml_sol_single_level;
     }
-};
+
 
 int main(int argc, char** args) {
 
@@ -829,7 +905,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 4;
+    unsigned max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
@@ -848,9 +924,9 @@ int main(int argc, char** args) {
         "w", "wsxxd", "wsxyd", "wsyyd"
     };
     std::vector<Math::Function<double>*> analytical_functions = {
-        &analytical_u, &analytical_sxx, &analytical_sxy, &analytical_syy,
-        &analytical_ud, &analytical_sxxd, &analytical_sxyd, &analytical_syyd,
-        &analytical_w, &analytical_wsxxd, &analytical_wsxyd, &analytical_wsyyd
+        &analytical_u_solution, &analytical_sxx_solution, &analytical_sxy_solution, &analytical_syy_solution,
+        &analytical_ud_solution, &analytical_sxxd_solution, &analytical_sxyd_solution, &analytical_syyd_solution,
+        &analytical_w_solution, &analytical_wsxxd_solution, &analytical_wsxyd_solution, &analytical_wsyyd_solution
     };
 
     for (unsigned u_idx = 0; u_idx < 12; u_idx++) {
@@ -874,7 +950,7 @@ int main(int argc, char** args) {
     app_specs._system_name = "Biharmonic12";
     app_specs._assemble_function = System_assemble_interface_StressBased<LinearImplicitSystem, double, double>;
     app_specs._assemble_function_for_rhs = &source_function;
-    app_specs._true_solution_function = &analytical_u;
+    app_specs._true_solution_function = &analytical_u_solution;
     app_specs._boundary_conditions_types_and_values = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
     ml_prob.set_app_specs_pointer(&app_specs);
     // ======= System Specifics for Stress-Based Problem - END ==================
