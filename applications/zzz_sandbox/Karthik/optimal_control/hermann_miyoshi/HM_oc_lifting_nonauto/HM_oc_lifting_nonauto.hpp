@@ -1542,7 +1542,51 @@ for (unsigned i = 0; i < nDofs_syyd; ++i) {
 }
 
 
+// ------------------ 9. Equation for w (aResW) ------------------
+// Offset: u(0), sxx(1), sxy(2), syy(3), ud(4), sxxd(5), sxyd(6), syyd(7)
+unsigned row_9_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd;
 
+// Column Mapping
+unsigned col_9_idx  = row_9_idx;            // Variable index 8: w
+unsigned col_10_idx = row_9_idx + nDofs_w;  // Variable index 9: wsxxd
+
+for (unsigned i = 0; i < nDofs_w; ++i) {
+    // --- 1. RESIDUAL CALCULATION ---
+    real_num_mov strain_w_w = 0.0;
+    // Part A: Strain-like coupling with w (Var index 8)
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov val = (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
+        strain_w_w += val * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+    }
+
+    real_num_mov mass_w_wsxxd = 0.0;
+    // Part B: Mass coupling with wsxxd (Var index 9)
+    for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
+        real_num_mov val = (real_num_mov)phi_w[i] * (real_num_mov)phi_wsxxd[j];
+        mass_w_wsxxd += val * (real_num_mov)unknowns_local[9].elem_dofs()[j];
+    }
+
+    // Final Residual Update for Row 9
+    unk_element_jac_res.res()[row_9_idx + i] += (real_num)((strain_w_w + mass_w_wsxxd) * weight_qp);
+
+    // --- 2. JACOBIAN CONTRIBUTIONS ---
+
+    // Block [9, 9]: w coupling with w
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_ww = (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(row_9_idx + i) * total_local_dofs + (col_9_idx + j)] += (real_num)(jac_ww * weight_qp);
+    }
+
+    // Block [9, 10]: w coupling with wsxxd
+    for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
+        real_num_mov jac_wwsxxd = (real_num_mov)phi_w[i] * (real_num_mov)phi_wsxxd[j];
+        unk_element_jac_res.jac()[(row_9_idx + i) * total_local_dofs + (col_10_idx + j)] += (real_num)(jac_wwsxxd * weight_qp);
+    }
+}
+
+
+
+/*
 // ------------------ 9. Equation for w (aResW) ------------------
 // Offset: u(0), sxx(1), sxy(2), syy(3), ud(4), sxxd(5), sxyd(6), syyd(7)
 unsigned row_9_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd;
@@ -1578,6 +1622,8 @@ for (unsigned i = 0; i < nDofs_w; ++i) {
     // --- Final Residual Update for Row 9 ---
     unk_element_jac_res.res()[row_9_idx + i] += (real_num)((strain_w_w + mass_w_wsxxd) * weight_qp);
 }
+*/
+
 
 // ------------------ 10. Equation for wsxxd (aReswsxxd) ------------------
 // Target: 10th row. Offset follows variable 7 (syyd) and variable 8 (w).
@@ -1585,6 +1631,54 @@ unsigned row_10_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + n
 
 // Target: 9th column (Variable index 8: w)
 //unsigned col_9_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd;
+
+// Target: 11th column (Variable index 10: wsxyd)
+unsigned col_11_idx = row_10_idx + nDofs_wsxxd;
+
+for (unsigned i = 0; i < nDofs_wsxxd; ++i) {
+    // --- 1. RESIDUAL CALCULATION ---
+    real_num_mov strain_wxy_ud = 0.0;
+    // Part A: Strain block on the 9th Column (w)
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov val = (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1] +
+                           (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
+        strain_wxy_ud += val * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+    }
+
+    real_num_mov mass_wsxyd = 0.0;
+    // Part B: Mass block on the 11th Column (wsxyd)
+    for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+        real_num_mov val = 2.0 * (real_num_mov)phi_wsxxd[i] * (real_num_mov)phi_wsxyd[j];
+        mass_wsxyd += val * (real_num_mov)unknowns_local[10].elem_dofs()[j];
+    }
+
+    // Update Residual for Row 10
+    unk_element_jac_res.res()[row_10_idx + i] += (real_num)((strain_wxy_ud + mass_wsxyd) * weight_qp);
+
+    // --- 2. JACOBIAN CONTRIBUTIONS ---
+
+    // Jacobian Block [10, 9]: Coupling with w
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov jac_wsxxd_w = (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1] +
+                                   (real_num_mov)gradphi_wsxxd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(row_10_idx + i) * total_local_dofs + (col_9_idx + j)] += (real_num)(jac_wsxxd_w * weight_qp);
+    }
+
+    // Jacobian Block [10, 11]: Coupling with wsxyd
+    for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
+        real_num_mov jac_wsxxd_wsxyd = 2.0 * (real_num_mov)phi_wsxxd[i] * (real_num_mov)phi_wsxyd[j];
+        unk_element_jac_res.jac()[(row_10_idx + i) * total_local_dofs + (col_11_idx + j)] += (real_num)(jac_wsxxd_wsxyd * weight_qp);
+    }
+}
+
+
+/*
+// ------------------ 10. Equation for wsxxd (aReswsxxd) ------------------
+// Target: 10th row. Offset follows variable 7 (syyd) and variable 8 (w).
+unsigned row_10_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w;
+
+// Target: 9th column (Variable index 8: w)
+// unsigned col_9_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd;
 
 // Target: 11th column (Variable index 10: wsxyd)
 unsigned col_11_idx = row_10_idx + nDofs_wsxxd;
@@ -1619,8 +1713,55 @@ for (unsigned i = 0; i < nDofs_wsxxd; ++i) {
     // Update Residual for Row 10
     unk_element_jac_res.res()[row_10_idx + i] += (real_num)((strain_wxy_ud + mass_wsxyd) * weight_qp);
 }
+*/
 
 
+// ------------------ 11. Equation for wsxyd (aReswsxyd) ------------------
+// Row Offset: u(0), sxx(1), sxy(2), syy(3), ud(4), sxxd(5), sxyd(6), syyd(7), w(8), wsxxd(9)
+unsigned row_11_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd;
+
+// Column Mapping
+//unsigned col_9_idx  = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd; // Var 8: w
+unsigned col_12_idx = row_11_idx + nDofs_wsxyd; // Var 11: wsyyd
+
+for (unsigned i = 0; i < nDofs_wsxyd; ++i) {
+    // --- 1. RESIDUAL CALCULATION ---
+    real_num_mov strain_w_yy = 0.0;
+    // Part A: Strain block on the 9th Column (Var 8: w)
+    // Mapping: ∫ ε_yy(w) · v_wsxyd
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov val = (real_num_mov)gradphi_wsxyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
+        strain_w_yy += val * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+    }
+
+    real_num_mov mass_wsxyd_wsyyd = 0.0;
+    // Part B: Mass block on the 12th Column (Var 11: wsyyd)
+    // Mapping: ∫ phi_wsxyd * phi_wsyyd
+    for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
+        real_num_mov val = (real_num_mov)phi_wsxyd[i] * (real_num_mov)phi_wsyyd[j];
+        mass_wsxyd_wsyyd += val * (real_num_mov)unknowns_local[11].elem_dofs()[j];
+    }
+
+    // Update Residual for Row 11
+    unk_element_jac_res.res()[row_11_idx + i] += (real_num)((strain_w_yy + mass_wsxyd_wsyyd) * weight_qp);
+
+    // --- 2. JACOBIAN CONTRIBUTIONS ---
+
+    // Jacobian Block [11, 9]: Coupling with w
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov val = (real_num_mov)gradphi_wsxyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(row_11_idx + i) * total_local_dofs + (col_9_idx + j)] += (real_num)(val * weight_qp);
+    }
+
+    // Jacobian Block [11, 12]: Coupling with wsyyd
+    for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
+        real_num_mov val = (real_num_mov)phi_wsxyd[i] * (real_num_mov)phi_wsyyd[j];
+        unk_element_jac_res.jac()[(row_11_idx + i) * total_local_dofs + (col_12_idx + j)] += (real_num)(val * weight_qp);
+    }
+}
+
+
+/*
 // ------------------ 11. Equation for wsxyd (aResWsxyd) ------------------
 // Row Offset: u(0), sxx(1), sxy(2), syy(3), ud(4), sxxd(5), sxyd(6), syyd(7), w(8), wsxxd(9)
 unsigned row_11_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd;
@@ -1658,8 +1799,100 @@ for (unsigned i = 0; i < nDofs_wsxyd; ++i) {
     // Update Residual for Row 11
     unk_element_jac_res.res()[row_11_idx + i] += (real_num)((strain_w_yy + mass_wsxyd_wsyyd) * weight_qp);
 }
+*/
 
 
+// ------------------ 12. Equation for wsyyd (aReswsyyd) ------------------
+// Offset: u(0), sxx(1), sxy(2), syy(3), ud(4), sxxd(5), sxyd(6), syyd(7), w(8), wsxxd(9), wsxyd(10)
+unsigned row_wsyyd_idx = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd;
+
+// Column Offsets
+unsigned col_u_idx     = 0;
+unsigned shift_offset  = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud; // Points to Var 5 (sxxd)
+unsigned col_w_idx     = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd; // Var 8
+
+for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
+    // --- 1. RESIDUAL CALCULATION ---
+    real_num_mov res_val = 0.0;
+
+    // Part A: Coupling with Primal Displacement u (Var index 0)
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        real_num_mov a_utilde = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_u[j];
+        res_val += a_utilde * (real_num_mov)unknowns_local[0].elem_dofs()[j];
+    }
+
+    // Part B: Adjoint Stress Couplings (sxxd, sxyd, syyd)
+    // B_xx (Var 5)
+    for (unsigned j = 0; j < nDofs_sxxd; ++j) {
+        real_num_mov bxx = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad + 0];
+        res_val += bxx * (real_num_mov)unknowns_local[5].elem_dofs()[j];
+    }
+    // B_xy (Var 6)
+    for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+        real_num_mov bxy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] +
+                           (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 0];
+        res_val += bxy * (real_num_mov)unknowns_local[6].elem_dofs()[j];
+    }
+    // B_yy (Var 7)
+    for (unsigned j = 0; j < nDofs_syyd; ++j) {
+        real_num_mov byy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
+        res_val += byy * (real_num_mov)unknowns_local[7].elem_dofs()[j];
+    }
+
+    // Part C: Coupling with Adjoint Displacement w (Var index 8)
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov stiff = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] +
+                             (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
+        real_num_mov mass = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j];
+        real_num_mov total_w_kernel = (gamma * stiff + beta * mass);
+        res_val += total_w_kernel * (real_num_mov)unknowns_local[8].elem_dofs()[j];
+    }
+
+    const real_num_mov w_rhs = f_val * (real_num_mov)phi_wsyyd[i];
+
+    // Final Residual Update
+    unk_element_jac_res.res()[row_wsyyd_idx + i] += (real_num)(res_val - w_rhs) * weight_qp;
+
+    // --- 2. JACOBIAN CONTRIBUTIONS ---
+
+    // Block [11, 0]: Coupling with u
+    for (unsigned j = 0; j < nDofs_u; ++j) {
+        real_num_mov jac_utilde = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_u[j];
+        unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (col_u_idx + j)] += (real_num)(jac_utilde * weight_qp);
+    }
+
+    // Block [11, 5]: Coupling with sxxd
+    for (unsigned j = 0; j < nDofs_sxxd; ++j) {
+        real_num_mov bxx = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (shift_offset + j)] += (real_num)(bxx * weight_qp);
+    }
+
+    // Block [11, 6]: Coupling with sxyd
+    for (unsigned j = 0; j < nDofs_sxyd; ++j) {
+        real_num_mov bxy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] +
+                           (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 0];
+        unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (shift_offset + nDofs_sxxd + j)] += (real_num)(bxy * weight_qp);
+    }
+
+    // Block [11, 7]: Coupling with syyd
+    for (unsigned j = 0; j < nDofs_syyd; ++j) {
+        real_num_mov byy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
+        unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (shift_offset + nDofs_sxxd + nDofs_sxyd + j)] += (real_num)(byy * weight_qp);
+    }
+
+    // Block [11, 8]: Coupling with w
+    for (unsigned j = 0; j < nDofs_w; ++j) {
+        real_num_mov stiff = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] +
+                             (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
+        real_num_mov mass = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j];
+        real_num_mov total_w_kernel = (gamma * stiff + beta * mass);
+        unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (col_w_idx + j)] += (real_num)(total_w_kernel * weight_qp);
+    }
+}
+
+
+
+/*
 // ------------------ 12. Equation for wsyyd (aResWsyyd) ------------------
 // Offset: u(0), sxx(1), sxy(2), syy(3), ud(4), sxxd(5), sxyd(6), syyd(7), w(8), wsxxd(9), wsxyd(10), wsyyd(11)
 unsigned row_wsyyd = nDofs_u + nDofs_sxx + nDofs_sxy + nDofs_syy + nDofs_ud + nDofs_sxxd + nDofs_sxyd + nDofs_syyd + nDofs_w + nDofs_wsxxd + nDofs_wsxyd;
@@ -1721,7 +1954,7 @@ for (unsigned j = 0; j < nDofs_syyd; ++j) {
     // Final Residual Update
     unk_element_jac_res.res()[row_wsyyd + i] += (real_num)(res_val - w_rhs ) * weight_qp;
 }
-
+*/
 
 
 
@@ -1740,7 +1973,7 @@ for (unsigned j = 0; j < nDofs_syyd; ++j) {
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = false;
+        constexpr bool print_algebra_local = true;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = unk_num_elem_dofs;
             assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 12, 12);
