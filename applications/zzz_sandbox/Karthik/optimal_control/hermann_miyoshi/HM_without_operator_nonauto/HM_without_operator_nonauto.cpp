@@ -643,7 +643,6 @@ int main(int argc, char** args) {
     // Auxiliary mesh for incremental refinement
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
     ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(input_file_total);
-
     // Solution generation class
     Solution_generation_StressBased< double > my_solution_generation;
 

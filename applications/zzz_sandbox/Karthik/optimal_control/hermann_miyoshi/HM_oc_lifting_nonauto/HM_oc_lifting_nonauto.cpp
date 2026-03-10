@@ -808,7 +808,8 @@ const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_sin
     const bool my_solution_generation_has_equation_solve
 ) const{
         unsigned numberOfUniformLevels = lev + 1;
-        ml_mesh_single_level.RefineMesh(numberOfUniformLevels, numberOfUniformLevels, NULL);
+         unsigned numberOfSelectiveLevels = 0;
+        ml_mesh_single_level.RefineMesh(numberOfUniformLevels, numberOfUniformLevels + numberOfSelectiveLevels, NULL);
         ml_mesh_single_level.EraseCoarseLevels(numberOfUniformLevels - 1);
         ml_mesh_single_level.PrintInfo();
 
@@ -850,8 +851,8 @@ const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_sin
 
             ml_prob.set_current_system_number(0);
             system.init();
-                    system.ClearVariablesToBeSolved();
-        system.AddVariableToBeSolved("All");
+            system.ClearVariablesToBeSolved();
+            system.AddVariableToBeSolved("All");
             system.SetOuterSolver(PREONLY);
             system.MGsolve();
         }
@@ -862,7 +863,8 @@ const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_sin
 
         // Print output
         for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
-            std::vector < std::string > variablesToBePrinted = {unknowns[u_idx]._name};
+            std::vector < std::string > variablesToBePrinted;
+            variablesToBePrinted.push_back(unknowns[u_idx]._name);
             std::ostringstream output_filename;
             output_filename << unknowns[u_idx]._name << "_stress_FE" << unknowns[u_idx]._fe_order << "_level" << lev;
             ml_sol_single_level.GetWriter()->Write(output_filename.str(), ml_prob.GetFilesHandler()->GetOutputPath(), "biquadratic", variablesToBePrinted, lev);

@@ -927,8 +927,8 @@ static void AssembleBilaplaceProblem_AD(
     if (assembleMatrix) KK->zero();
 
     // Physics Constants
-    const double beta = 0.0001;
-    const double gamma = 0.01;
+// // //     const double beta = 0.000001;
+// // //     const double gamma = 0.00001;
     // const double nu = 0.0; // Poisson ratio unused in provided AD code
 
     constexpr unsigned int space_dim = 2; // max spatial dimension
@@ -1200,7 +1200,9 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
                 }
             }
 
-
+    // Regularization parameters
+    const double beta = 0.000000001;
+    const double gamma = 0.000000001;
 
             // ==================== RESIDUALS & JACOBIANS ====================
 
@@ -1973,11 +1975,11 @@ for (unsigned j = 0; j < nDofs_syyd; ++j) {
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = true;
+        constexpr bool print_algebra_local = false;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = unk_num_elem_dofs;
-            assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 12, 12);
-            assemble_jacobian<double,double>::print_element_residual(iel, Res_total, Sol_n_el_dofs_Mat_vol, 12, 12);
+            assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 13, 5);
+            assemble_jacobian<double,double>::print_element_residual(iel, Res_total, Sol_n_el_dofs_Mat_vol, 13, 12);
         }
 
     } // end element loop
