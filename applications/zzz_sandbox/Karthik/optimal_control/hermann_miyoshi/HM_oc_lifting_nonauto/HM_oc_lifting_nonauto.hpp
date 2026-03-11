@@ -1201,8 +1201,8 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
             }
 
     // Regularization parameters
-    const double beta = 0.000000001;
-    const double gamma = 0.000000001;
+    const double beta = 1.e-5;
+    const double gamma = 1.e-5;
 
             // ==================== RESIDUALS & JACOBIANS ====================
 

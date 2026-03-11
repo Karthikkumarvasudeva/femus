@@ -728,32 +728,80 @@ double Solution_set_initial_conditions(const MultiLevelProblem * ml_prob, const 
 
 // Boundary Conditions
 bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
+    bool dirichlet  = false;
     if (!strcmp(SolName, "u")) {
         Value = analytical_u_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "sxx")) {
         Value = analytical_sxx_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "sxy")) {
         Value = analytical_sxy_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "syy")) {
         Value = analytical_syy_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "ud")) {
         Value = analytical_ud_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "sxxd")) {
         Value = analytical_sxxd_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "sxyd")) {
         Value = analytical_sxyd_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "syyd")) {
         Value = analytical_syyd_solution.value(x);
+        dirichlet = true;
     } else if (!strcmp(SolName, "w")) {
         Value = analytical_w_solution.value(x);
+         if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+        dirichlet = true;
+        }
+        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+            dirichlet = true ;
+        }
+        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+         dirichlet = true;
+        }
     } else if (!strcmp(SolName, "wsxxd")) {
         Value = analytical_wsxxd_solution.value(x);
+//         dirichlet = true;
+                 if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+        dirichlet = true;
+        }
+        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+            dirichlet = true ;
+        }
+        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+         dirichlet = true;
+        }
     } else if (!strcmp(SolName, "wsxyd")) {
         Value = analytical_wsxyd_solution.value(x);
+//         dirichlet = true;
+                         if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+        dirichlet = true;
+        }
+        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+            dirichlet = true ;
+        }
+        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+         dirichlet = true;
+        }
     } else if (!strcmp(SolName, "wsyyd")) {
         Value = analytical_wsyyd_solution.value(x);
+//         dirichlet = true;
+                         if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+        dirichlet = true;
+        }
+        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+            dirichlet = true ;
+        }
+        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+         dirichlet = true;
+        }
     }
-    return true;
+    return dirichlet;
 }
 
 
@@ -907,7 +955,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 5;
+    unsigned max_number_of_meshes = 6;
 
     // Auxiliary mesh for incremental refinement
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
