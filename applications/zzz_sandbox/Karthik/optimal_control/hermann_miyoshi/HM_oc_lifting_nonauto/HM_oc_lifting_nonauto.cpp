@@ -766,40 +766,40 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem *
         }
     } else if (!strcmp(SolName, "wsxxd")) {
         Value = analytical_wsxxd_solution.value(x);
-//         dirichlet = true;
-                 if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
         dirichlet = true;
-        }
-        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
-            dirichlet = true ;
-        }
-        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
-         dirichlet = true;
-        }
+// // //                  if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+// // //         dirichlet = true;
+// // //         }
+// // //         if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+// // //             dirichlet = true ;
+// // //         }
+// // //         if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+// // //          dirichlet = true;
+// // //         }
     } else if (!strcmp(SolName, "wsxyd")) {
         Value = analytical_wsxyd_solution.value(x);
-//         dirichlet = true;
-                         if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
         dirichlet = true;
-        }
-        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
-            dirichlet = true ;
-        }
-        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
-         dirichlet = true;
-        }
+// // //                          if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+// // //         dirichlet = true;
+// // //         }
+// // //         if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+// // //             dirichlet = true ;
+// // //         }
+// // //         if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+// // //          dirichlet = true;
+// // //         }
     } else if (!strcmp(SolName, "wsyyd")) {
         Value = analytical_wsyyd_solution.value(x);
-//         dirichlet = true;
-                         if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
         dirichlet = true;
-        }
-        if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
-            dirichlet = true ;
-        }
-        if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
-         dirichlet = true;
-        }
+// // //                          if (x[0] < 0.5 + 1.e-7 && x[0] > 0.5 - 1.e-7){
+// // //         dirichlet = true;
+// // //         }
+// // //         if (x[1] < 0.5 + 1.e-7 && x[1] > 0.5 - 1.e-7){
+// // //             dirichlet = true ;
+// // //         }
+// // //         if (x[1] >-0.5 - 1.e-7 && x[1] < -0.5 + 1.e-7){
+// // //          dirichlet = true;
+// // //         }
     }
     return dirichlet;
 }
