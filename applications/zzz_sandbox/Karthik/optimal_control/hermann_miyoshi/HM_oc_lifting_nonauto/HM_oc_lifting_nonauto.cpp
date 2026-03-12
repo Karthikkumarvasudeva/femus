@@ -359,8 +359,8 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
-
 */
+
 
 
 template <class type = double>
@@ -616,6 +616,8 @@ private:
     static constexpr double pi = acos(-1.);
     // static constexpr double a = 0.001;
 };
+
+
 /*
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> {
@@ -689,9 +691,9 @@ static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> ana
 static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_sxyd_solution;
 static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_syyd_solution;
 static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w<> analytical_w_solution;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_wsxxd_solution;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_wsxyd_solution;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_wsyyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx<> analytical_wsxxd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy<> analytical_wsxyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy<> analytical_wsyyd_solution;
 static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr<> source_function;
 
 
@@ -946,7 +948,7 @@ int main(int argc, char** args) {
     const std::string input_file_total = input_file_path + input_mesh_filename;
 
     ml_mesh.ReadCoarseMesh(input_file_total);
-    // ======= Mesh, Coarse, file - END ========================
+    // ======= Mesh, Coarse, file - END =======================
 
     // ======= Quad Rule - BEGIN ========================
     std::string fe_quad_rule("seventh");
@@ -955,7 +957,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 6;
+    unsigned max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
