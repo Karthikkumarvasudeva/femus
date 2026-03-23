@@ -1,5 +1,5 @@
-#ifndef __femus_biharmonic_HM_hpp__
-#define __femus_biharmonic_HM_hpp__
+#ifndef __femus_biharmonic_HM_oc_lifting_nonauto_hpp__
+#define __femus_biharmonic_HM_oc_lifting_nonauto_hpp__
 
 #include "FemusInit.hpp"  //for the adept stack
 
@@ -12,7 +12,7 @@
 #include "NumericVector.hpp"
 #include "SparseMatrix.hpp"
 #include "Assemble_jacobian.hpp"
-#include "Assemble_unknown_jacres.hpp" // <-- ADD THIS LINE to fix ElementJacRes errors
+#include "Assemble_unknown_jacres.hpp"
 #include "CurrentElem.hpp"
 /**
  * Given the non linear problem
@@ -907,7 +907,7 @@ static void AssembleBilaplaceProblem_AD(
      MultiLevelSolution * ml_sol_in,
      const std::vector< Unknown > &  unknowns,
      const std::vector< Math::Function< double > * > & source_functions) {
-  // // // const std::vector< Math::Function< double > * > & analytical_u;
+
     // level is the level of the PDE system to be assembled
     const unsigned level = mlPdeSys->GetLevelToAssemble();
     const bool assembleMatrix = mlPdeSys->GetAssembleMatrix();
@@ -926,10 +926,6 @@ static void AssembleBilaplaceProblem_AD(
     RES->zero();
     if (assembleMatrix) KK->zero();
 
-    // Physics Constants
-// // //     const double beta = 0.000001;
-// // //     const double gamma = 0.00001;
-    // const double nu = 0.0; // Poisson ratio unused in provided AD code
 
     constexpr unsigned int space_dim = 2; // max spatial dimension
     const unsigned int dim_offset_grad = dim;
@@ -1201,8 +1197,9 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
             }
 
     // Regularization parameters
-    const double beta = 1.e-5;
-    const double gamma = 1.;
+    const double alpha_0 = 1.e-1;
+    const double alpha_1 = 1.e-1;
+    const double alpha_2 = 1.e-1;
 
             // ==================== RESIDUALS & JACOBIANS ====================
 
@@ -1702,18 +1699,18 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
     // Part B: Adjoint Stress Couplings (sxxd, sxyd, syyd)
     // B_xx (Var 5)
     for (unsigned j = 0; j < nDofs_sxxd; ++j) {
-        real_num_mov bxx = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad + 0];
+        real_num_mov bxx = -(real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad + 0];
         res_val += bxx * (real_num_mov)unknowns_local[5].elem_dofs()[j];
     }
     // B_xy (Var 6)
     for (unsigned j = 0; j < nDofs_sxyd; ++j) {
-        real_num_mov bxy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] +
+        real_num_mov bxy = -(real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] +
                            (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 0];
         res_val += bxy * (real_num_mov)unknowns_local[6].elem_dofs()[j];
     }
     // B_yy (Var 7)
     for (unsigned j = 0; j < nDofs_syyd; ++j) {
-        real_num_mov byy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
+        real_num_mov byy = -(real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
         res_val += byy * (real_num_mov)unknowns_local[7].elem_dofs()[j];
     }
 
@@ -1722,7 +1719,7 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
         real_num_mov stiff = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] +
                              (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
         real_num_mov mass = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j];
-        real_num_mov total_w_kernel = (mass + beta * mass);
+        real_num_mov total_w_kernel = (mass + alpha_0 * mass + alpha_1 * stiff);
         res_val += total_w_kernel * (real_num_mov)unknowns_local[8].elem_dofs()[j];
     }
 
@@ -1730,18 +1727,18 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
 // Column Offset for Lambda starts after w (Var 10, 11, 12)
 
     for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
-        real_num_mov wbxx = -gamma * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad + 0];
+        real_num_mov wbxx = -alpha_2 * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad + 0];
         res_val += wbxx * (real_num_mov)unknowns_local[9].elem_dofs()[j];
     }
     // B_xy (Var 6)
     for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
-        real_num_mov wbxy = -gamma * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1] +
+        real_num_mov wbxy = -alpha_2 * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1] +
                            (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 0];
         res_val += wbxy * (real_num_mov)unknowns_local[10].elem_dofs()[j];
     }
     // B_yy (Var 7)
     for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
-        real_num_mov wbyy = -gamma * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1];
+        real_num_mov wbyy = -alpha_2 * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1];
         res_val += wbyy * (real_num_mov)unknowns_local[11].elem_dofs()[j];
     }
 
@@ -1750,12 +1747,12 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
         real_num_mov stiff = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] +
                              (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
         real_num_mov mass = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j];
-        real_num_mov total_w_kernel = (mass + beta * mass);
+        real_num_mov total_w_kernel = (mass + alpha_0 * mass + alpha_1 * stiff);
         res_val += total_w_kernel * (real_num_mov)unknowns_local[8].elem_dofs()[j];
     }
 
 
-    const real_num_mov w_rhs = f_val * (real_num_mov)phi_wsyyd[i];
+    const real_num_mov w_rhs = f_val * (real_num_mov)phi_ud[i];
 
     // Final Residual Update
     unk_element_jac_res.res()[row_wsyyd_idx + i] += (real_num)(res_val - w_rhs) * weight_qp;
@@ -1773,20 +1770,20 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
 
 
     for (unsigned j = 0; j < nDofs_sxxd; ++j) {
-        real_num_mov bxx = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad + 0];
+        real_num_mov bxx = -(real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxxd[j * dim_offset_grad + 0];
         unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (shift_offset + j)] += (real_num)(bxx * weight_qp);
     }
 
 
     for (unsigned j = 0; j < nDofs_sxyd; ++j) {
-        real_num_mov bxy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] +
+        real_num_mov bxy = -(real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 1] +
                            (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_sxyd[j * dim_offset_grad + 0];
         unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (shift_offset + nDofs_sxxd + j)] += (real_num)(bxy * weight_qp);
     }
 
 
     for (unsigned j = 0; j < nDofs_syyd; ++j) {
-        real_num_mov byy = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
+        real_num_mov byy = -(real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_syyd[j * dim_offset_grad + 1];
         unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (shift_offset + nDofs_sxxd + nDofs_sxyd + j)] += (real_num)(byy * weight_qp);
     }
 
@@ -1795,7 +1792,7 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
         real_num_mov stiff = (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_w[j * dim_offset_grad + 0] +
                              (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_w[j * dim_offset_grad + 1];
         real_num_mov mass = (real_num_mov)phi_wsyyd[i] * (real_num_mov)phi_w[j];
-        real_num_mov total_w_kernel = (mass + beta * mass);
+        real_num_mov total_w_kernel = (mass + alpha_0 * mass + alpha_1 * stiff);
         unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (col_w_idx + j)] += (real_num)(total_w_kernel * weight_qp);
     }
 
@@ -1809,14 +1806,14 @@ unsigned col_L_idx = col_w_idx + nDofs_w;
 // Block [11, 9]: Coupling with wsxxd (-gamma * Cxx)
 for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
     // Both derivatives are X (0)
-    real_num_mov g_wbxx = -gamma * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad + 0];
+    real_num_mov g_wbxx = -alpha_2 * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad + 0];
     unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (col_L_idx + j)] += (real_num)(g_wbxx * weight_qp);
 }
 
 // Block [11, 10]: Coupling with wsxyd (-gamma * Cxy)
 for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
     // Mixed derivatives (0*1 + 1*0)
-    real_num_mov g_wbxy = -gamma * (
+    real_num_mov g_wbxy = -alpha_2 * (
         (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1] +
         (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 0]
     );
@@ -1826,7 +1823,7 @@ for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
 // Block [11, 11]: Coupling with wsyyd (-gamma * Cyy)
 for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
     // Both derivatives are Y (1)
-    real_num_mov g_wbyy = -gamma * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1];
+    real_num_mov g_wbyy = -alpha_2 * (real_num_mov)gradphi_wsyyd[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1];
     unk_element_jac_res.jac()[(row_wsyyd_idx + i) * total_local_dofs + (col_L_idx + nDofs_wsxxd + nDofs_wsxyd + j)] += (real_num)(g_wbyy * weight_qp);
 }
 
@@ -1851,8 +1848,8 @@ for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
         constexpr bool print_algebra_local = false;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = unk_num_elem_dofs;
-            assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 13, 5);
-            assemble_jacobian<double,double>::print_element_residual(iel, Res_total, Sol_n_el_dofs_Mat_vol, 13, 12);
+            assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 10, 5);
+            assemble_jacobian<double,double>::print_element_residual(iel, Res_total, Sol_n_el_dofs_Mat_vol, 10, 5);
         }
 
     } // end element loop
