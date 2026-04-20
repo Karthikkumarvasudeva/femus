@@ -334,7 +334,7 @@ class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> 
 
 public:
     type value(const std::vector<type>& x) const {
-        return 1.; // 4096π⁸ = (8π²)⁴
+        return 1.;
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
@@ -637,7 +637,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 8;
+    unsigned max_number_of_meshes = 4;
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement

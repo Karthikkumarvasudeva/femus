@@ -1479,7 +1479,7 @@ for (unsigned i = 0; i < nDofs_q; ++i) {
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = false;
+        constexpr bool print_algebra_local = true;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = {nDofs_u, nDofs_sxx, nDofs_sxy, nDofs_syy, nDofs_ud, nDofs_sxxd, nDofs_sxyd, nDofs_syyd, nDofs_q};
             assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 10, 5);
