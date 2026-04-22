@@ -35,7 +35,7 @@
  **/
 
 using namespace femus;
- static constexpr double alpha = 0.00001;
+ static constexpr double alpha = 0.0001;
 
 namespace karthik {
   
@@ -904,7 +904,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
 
   //  extract pointers to the several objects that we are going to use
 
-  NonLinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<NonLinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
+  LinearImplicitSystem* mlPdeSys   = &ml_prob.get_system<LinearImplicitSystem> (ml_prob.get_app_specs_pointer()->_system_name);
 
   const unsigned level = mlPdeSys->GetLevelToAssemble();
 

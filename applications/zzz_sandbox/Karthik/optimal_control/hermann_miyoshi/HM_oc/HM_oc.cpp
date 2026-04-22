@@ -48,7 +48,6 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-      static constexpr double a = 0.00000001;
 
 /*
 template <class type = double>
@@ -191,7 +190,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // // // static constexpr double a = 0.001;
+        static constexpr double a = alpha;
 };
 
 
@@ -219,7 +218,8 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // // // static constexpr double a = 0.001;
+    static constexpr double a = alpha;
+
 };
 
 
@@ -245,7 +245,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // // // static constexpr double a = 0.001;
+    static constexpr double a = alpha;
 };
 
 
@@ -296,7 +296,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // // // static constexpr double a = 0.001;
+    static constexpr double a = alpha;
 };
 
 
@@ -307,7 +307,6 @@ public:
     type value(const std::vector<type>& x) const {
         type base = sin(2*pi*x[0])*sin(2*pi*x[1]);
         return (1. - a * 4096.*pow(pi, 8)) * base; // 4096π⁸ = (8π²)⁴;
-                // // // return  base; // 4096π⁸ = (8π²)⁴
 
     }
 
@@ -327,7 +326,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // // // static constexpr double a = 0.001;
+    static constexpr double a = alpha;
 
 };
 
@@ -359,8 +358,8 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
-
 */
+
 
 
 template <class type = double>
@@ -532,7 +531,8 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // static constexpr double a = 0.001; // or your chosen α value
+        static constexpr double a = alpha;
+
 };
 
 template <class type = double>
@@ -558,7 +558,8 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // static constexpr double a = 0.001;
+        static constexpr double a = alpha;
+
 };
 
 
@@ -586,7 +587,8 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // static constexpr double a = 0.001;
+        static constexpr double a = alpha;
+
 };
 
 
@@ -614,7 +616,8 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // static constexpr double a = 0.001;
+        static constexpr double a = alpha;
+
 };
 
 template <class type = double>
@@ -642,7 +645,7 @@ public:
 
 private:
     static constexpr double pi = acos(-1.);
-    // static constexpr double a = 0.001;
+        static constexpr double a = alpha;
 };
 
 
@@ -783,7 +786,7 @@ int main(int argc, char** args) {
   const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
   mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
 
-  unsigned maxNumberOfMeshes = 6;
+  unsigned maxNumberOfMeshes = 5;
 
   std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
 
@@ -877,7 +880,7 @@ int main(int argc, char** args) {
       system.AddSolutionToSystemPDE("sxy");
       system.AddSolutionToSystemPDE("syy");
 
-            system.AddSolutionToSystemPDE("ud");
+      system.AddSolutionToSystemPDE("ud");
       system.AddSolutionToSystemPDE("sxxd");
       system.AddSolutionToSystemPDE("sxyd");
       system.AddSolutionToSystemPDE("syyd");
@@ -888,7 +891,7 @@ int main(int argc, char** args) {
       system.SetAssembleFunction(system_biharmonic_HM._assemble_function);
 
       system.init();
-            system.SetOuterSolver(PREONLY);
+      system.SetOuterSolver(PREONLY);
 
       system.MGsolve();
 

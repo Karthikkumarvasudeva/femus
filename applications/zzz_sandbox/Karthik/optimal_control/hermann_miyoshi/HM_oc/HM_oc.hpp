@@ -35,6 +35,7 @@
  **/
 
 using namespace femus;
+ static constexpr double alpha = 0.0000001;
 
 
 namespace karthik {
@@ -1060,7 +1061,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   KK->zero(); // Set to zero all the entries of the Global Matrix
 
 
-double alpha = .00000001 ;
+
 double nu =  0. /* Poisson ratio value */;
 
 
