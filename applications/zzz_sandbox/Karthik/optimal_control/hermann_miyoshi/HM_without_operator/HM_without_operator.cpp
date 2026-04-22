@@ -359,7 +359,7 @@ private:
 };
 */
 
-/*
+
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
 
@@ -645,10 +645,10 @@ private:
     static constexpr double pi = acos(-1.);
         static constexpr double a = alpha;
 };
-*/
 
 
 
+/*
 // Primal state: u_bar = cos^2(pi x) * cos^2(pi y)
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
@@ -933,7 +933,7 @@ private:
     static constexpr double a = alpha;
 };
 
-
+*/
 
 
 
