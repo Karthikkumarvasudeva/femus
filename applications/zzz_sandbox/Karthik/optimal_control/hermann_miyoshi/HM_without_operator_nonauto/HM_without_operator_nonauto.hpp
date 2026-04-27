@@ -39,7 +39,7 @@
  **/
 
 using namespace femus;
-
+static constexpr double alpha = 0.0001;
 
 namespace karthik {
   
@@ -1141,7 +1141,7 @@ static void AssembleBilaplaceProblem_AD(
 
             // Source f(x) at gauss point
             const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss);
-            const double alpha = 0.0000000001; // Regularization parameter
+            //const double alpha = 0.0000000001; // Regularization parameter
 
             // ==================== RESIDUAL AND JACOBIAN CALCULATIONS ====================
 
