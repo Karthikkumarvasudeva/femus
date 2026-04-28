@@ -48,7 +48,7 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-    static constexpr double a = 0.0000000001;
+    static constexpr double a = alpha;
 
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
@@ -637,7 +637,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 5;
+    unsigned max_number_of_meshes = 7;
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
@@ -687,8 +687,8 @@ int main(int argc, char** args) {
     // ======= System Specifics for Stress-Based Problem - END ==================
 
     // Various choices for convergence study
-    std::vector < bool > convergence_rate_computation_method_Flag = {true, true};
-    std::vector < bool > volume_or_boundary_Flag = {true, true};
+    std::vector < bool > convergence_rate_computation_method_Flag = {true, false};
+    std::vector < bool > volume_or_boundary_Flag = {true, false};
     std::vector < bool > sobolev_norms_Flag = {true, true};
 
     // ======= Perform Convergence Study ========================
