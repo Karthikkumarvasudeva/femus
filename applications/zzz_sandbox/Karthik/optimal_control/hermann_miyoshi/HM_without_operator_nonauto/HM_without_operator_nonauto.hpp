@@ -1,6 +1,6 @@
 #ifndef __femus_biharmonic_HM_without_operator_nonauto_hpp__
 #define __femus_biharmonic_HM_without_operator_nonauto_hpp__
- 
+
 #include "FemusInit.hpp"  //for the adept stack
 
 #include "MultiLevelProblem.hpp"
@@ -39,12 +39,12 @@
  **/
 
 using namespace femus;
-static constexpr double alpha = 0.0001;
+
 
 namespace karthik {
-  
+
   class biharmonic_HM_without_operator_nonauto {
-    
+
   public:
 
 
@@ -1141,7 +1141,7 @@ static void AssembleBilaplaceProblem_AD(
 
             // Source f(x) at gauss point
             const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss);
-            //const double alpha = 0.0000000001; // Regularization parameter
+            const double alpha = 0.0000000001; // Regularization parameter
 
             // ==================== RESIDUAL AND JACOBIAN CALCULATIONS ====================
 
@@ -1479,7 +1479,7 @@ for (unsigned i = 0; i < nDofs_q; ++i) {
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = true;
+        constexpr bool print_algebra_local = false;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = {nDofs_u, nDofs_sxx, nDofs_sxy, nDofs_syy, nDofs_ud, nDofs_sxxd, nDofs_sxyd, nDofs_syyd, nDofs_q};
             assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 10, 5);
@@ -1493,7 +1493,7 @@ for (unsigned i = 0; i < nDofs_q; ++i) {
 }
 
   };
-  
+
 }
 
 #endif
