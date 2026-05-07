@@ -39,7 +39,7 @@
  **/
 
 using namespace femus;
- static constexpr double alpha = 0.000001;
+ static constexpr double alpha = 0.000000001;
 
 
 namespace karthik {
@@ -901,7 +901,7 @@ static void natural_loop_2d3dSxx(const MultiLevelProblem *    ml_prob,
 
 
 template < class system_type, class real_num, class real_num_mov >
-static void AssembleBilaplaceProblem_AD(
+static void AssembleBilaplaceProblem_AD_HM_nonauto(
      const std::vector < std::vector < /*const*/ elem_type_templ_base<real_num, real_num_mov> * > > & elem_all,
      const std::vector < std::vector < /*const*/ elem_type_templ_base<real_num_mov, real_num_mov> * > > & elem_all_for_domain,
      const std::vector<Gauss> & quad_rules,
@@ -1181,7 +1181,7 @@ for (unsigned i = 0; i < nDofs_u; ++i) {
 
     // Jacobian contributions
     for (unsigned j = 0; j < nDofs_sxx; ++j) {
-        real_num_mov jac_usxx = (real_num_mov)gradphi_u[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxx[j*dim_offset_grad];
+        real_num_mov jac_usxx = (real_num_mov)gradphi_u[i * dim_offset_grad + 0] * (real_num_mov)gradphi_sxx[j*dim_offset_grad + 0];
         unk_element_jac_res.jac()[i * total_local_dofs + (nDofs_u + j)] += (real_num)(jac_usxx * weight_qp);
     }
 
@@ -1240,10 +1240,10 @@ for (unsigned i = 0; i < nDofs_sxy; ++i) {
             strain_xy += (real_num_mov)gradphi_sxy[i * dim_offset_grad + 1] * (real_num_mov)gradphi_u[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[0].elem_dofs()[j];
         }
     }
-
+// *********************************************************************************************************************************************** mass_sxy = 2.0
     real_num_mov mass_sxy = 0.0;
     for (unsigned j = 0; j < nDofs_sxy; ++j) {
-        mass_sxy += 2.0 * (real_num_mov)phi_sxy[i] * (real_num_mov)phi_sxy[j] * (real_num_mov)unknowns_local[2].elem_dofs()[j];
+        mass_sxy +=  2.0 * (real_num_mov)phi_sxy[i] * (real_num_mov)phi_sxy[j] * (real_num_mov)unknowns_local[2].elem_dofs()[j];
     }
 
     unk_element_jac_res.res()[nDofs_u + nDofs_sxx + i] += (real_num)((strain_xy + mass_sxy) * weight_qp);
@@ -1442,7 +1442,10 @@ for (unsigned i = 0; i < nDofs_q; ++i) {
     // R_q = ∫(ud + α·q)·v_q dΩ
     real_num_mov mass_ud = 0.0;
     for (unsigned j = 0; j < nDofs_ud; ++j) {
-        mass_ud += (real_num_mov)phi_ud[i] * (real_num_mov)phi_q[j] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+// // //         mass_ud += (real_num_mov)phi_ud[i] * (real_num_mov)phi_q[j] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+
+                mass_ud += (real_num_mov)phi_q[i] * (real_num_mov)phi_ud[j] * (real_num_mov)unknowns_local[4].elem_dofs()[j];
+
     }
 
     real_num_mov mass_q = 0.0;

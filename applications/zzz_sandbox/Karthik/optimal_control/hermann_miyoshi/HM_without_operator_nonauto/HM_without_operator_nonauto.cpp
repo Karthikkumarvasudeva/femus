@@ -409,25 +409,41 @@ static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr<> sou
  * @brief Sets initial conditions based on analytical solutions.
  */
 double Solution_set_initial_conditions_with_analytical_sol(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char * SolName) {
-    double value = 0.0;
+    double value ;
     if (!strcmp(SolName, "u")) {
-        value = analytical_u_solution.value(x);
+// // //         value = analytical_u_solution.value(x);
+                value = 0.;
     } else if (!strcmp(SolName, "sxx")) {
-        value = analytical_sxx_solution.value(x);
+// // //         value = analytical_sxx_solution.value(x);
+                value = 0.;
     } else if (!strcmp(SolName, "sxy")) {
-        value = analytical_sxy_solution.value(x);
+// // //         value = analytical_sxy_solution.value(x);
+                value = 0.;
+
     } else if (!strcmp(SolName, "syy")) {
-        value = analytical_syy_solution.value(x);
+// // //         value = analytical_syy_solution.value(x);
+                value = 0.;
+
     } else if (!strcmp(SolName, "ud")) {
-        value = analytical_ud_solution.value(x);
+// // //         value = analytical_ud_solution.value(x);
+                value = 0.;
+
     } else if (!strcmp(SolName, "sxxd")) {
-        value = analytical_sxxd_solution.value(x);
+// // //         value = analytical_sxxd_solution.value(x);
+                value = 0.;
+
     } else if (!strcmp(SolName, "sxyd")) {
-        value = analytical_sxyd_solution.value(x);
+// // //         value = analytical_sxyd_solution.value(x);
+                value = 0.;
+
     } else if (!strcmp(SolName, "syyd")) {
-        value = analytical_syyd_solution.value(x);
+// // //         value = analytical_syyd_solution.value(x);
+                value = 0.;
+
     } else if (!strcmp(SolName, "q")) {
-        value = analytical_q_solution.value(x);
+// // //         value = analytical_q_solution.value(x);
+                value = 0.;
+
     }
     return value;
 }
@@ -485,7 +501,7 @@ void System_assemble_interface_StressBased(MultiLevelProblem& ml_prob) {
 
     // Call the stress-based assembly function - CORRECTED CALL
     // Use the actual function name from your header file
-    NAMESPACE_FOR_BIHARMONIC_HM::biharmonic_HM_without_operator_nonauto::AssembleBilaplaceProblem_AD(
+    NAMESPACE_FOR_BIHARMONIC_HM::biharmonic_HM_without_operator_nonauto::AssembleBilaplaceProblem_AD_HM_nonauto(
         elem_all,
         elem_all_for_domain,
         ml_prob.GetQuadratureRuleAllGeomElems(),
@@ -637,7 +653,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 7;
+    unsigned max_number_of_meshes = 6;
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
