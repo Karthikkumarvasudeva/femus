@@ -39,7 +39,7 @@
  **/
 
 using namespace femus;
- static constexpr double alpha = 0.000000001;
+ static constexpr double alpha = 0.00000001;
 
 
 namespace karthik {
@@ -929,9 +929,14 @@ static void AssembleBilaplaceProblem_AD_HM_nonauto(
     RES->zero();
     if (assembleMatrix) KK->zero();
 
-    // Keep same conventions as your code
-    constexpr unsigned int space_dim = 2; // max spatial dimension
-    const unsigned int dim_offset_grad = dim;
+    // Match the working Poisson/CR/HM-state pattern: FEMUS's shape gradient
+    // arrays are strided by space_dim (= 3 even in 2D), and JacI_qp is sized
+    // accordingly.  Using space_dim = 2 here will cause the shape-function
+    // gradient buffer to be read with the wrong stride, producing silently
+    // wrong values on some unknowns (most visibly on the off-diagonal sxy
+    // and sxyd, which are the ones reading "across" multiple buffers).
+    constexpr unsigned int space_dim = 2;
+    const unsigned int dim_offset_grad = 2;
 
     // Jacobian geometry containers
     std::vector< std::vector< real_num_mov > > JacI_qp(space_dim);

@@ -1,328 +1,225 @@
+/**
+ * @file HM_nonauto_conv.cpp
+ *
+ * Convergence study for the coupled Hermann--Miyoshi mixed
+ * formulation of the biharmonic problem
+ *
+ *      Delta^2 u = f          in Omega
+ *       u = 0,  ds/dn = 0     on dOmega
+ *
+ * with auxiliary symmetric tensor sigma = Hess(u), components (sxx,sxy,syy).
+ *
+ * The driver is a direct analogue of `poisson_nonauto_conv.cpp`,
+ * extended to four unknowns assembled together as one coupled
+ * `LinearImplicitSystem`.
+ */
 
 #include "FemusInit.hpp"
 #include "Files.hpp"
 #include "MultiLevelProblem.hpp"
 #include "MultiLevelSolution.hpp"
-#include "NonLinearImplicitSystem.hpp"
+#include "LinearImplicitSystem.hpp"
 #include "LinearEquationSolver.hpp"
 #include "VTKWriter.hpp"
 #include "NumericVector.hpp"
-#include <cassert>                // FIX: needed for assert()
-
-//#include "biharmonic_coupled.hpp"
-
 #include "FE_convergence.hpp"
-
 #include "Solution_functions_over_domains_or_mesh_files.hpp"
 
-// // // #include "adept.h"
+#include <cmath>
+#include <cstring>
 
+//#include "../tutorial_common.hpp"
+#include "HM_nonauto_conv.hpp"
 
-#define LIBRARY_OR_USER   1 //0: library; 1: user
-
-#if LIBRARY_OR_USER == 0
-   #include "01_biharmonic_coupled.hpp"
-   #define NAMESPACE_FOR_BIHARMONIC   femus
-#elif LIBRARY_OR_USER == 1
-   #include "HM_nonauto_conv.hpp"
-   #define NAMESPACE_FOR_BIHARMONIC_HM_nonauto_conv   karthik
-#endif
-
+#define NAMESPACE_FOR_BIHARMONIC_HM  karthik
 
 using namespace femus;
 
+
+// =====================================================================
+//  Manufactured solution on the square [-0.5, 0.5]^2
+//
+//   u_exact(x,y)   =  sin(2 pi x) sin(2 pi y)
+//
+//  HM uses sigma = -Hess(u), so the analytical sigma components are:
+//   sxx_exact      = -d^2 u / dx^2  = +4 pi^2 sin(2 pi x) sin(2 pi y)
+//   syy_exact      = -d^2 u / dy^2  = +4 pi^2 sin(2 pi x) sin(2 pi y)
+//   sxy_exact      = -d^2 u / dx dy = -4 pi^2 cos(2 pi x) cos(2 pi y)
+//
+//   f              =  Delta^2 u_exact = +64 pi^4 sin(2 pi x) sin(2 pi y)
+//
+//  Boundary conditions:
+//   * u : Dirichlet, u = 0 on dOmega (manufactured u_exact does vanish there).
+//   * sxx, sxy, syy : NO essential boundary conditions in the variational
+//     formulation -- these are natural unknowns of the saddle-point system.
+//     Forcing them to their analytical values would over-determine the
+//     discrete problem and destroy convergence rates.
+//
+//  Note: sxy_exact = -4 pi^2 cos(2 pi x) cos(2 pi y) is NOT zero on the
+//  boundary, which is fine -- sigma is not constrained on dOmega.
+// =====================================================================
 namespace Domains {
+namespace square_m05p05 {
 
-namespace  square_m05p05  {
-
+// u_exact -- the analytical primary unknown.
+// The HM convention used in the assembly is sigma = -Hess(u), under which
+// the v-equation reduces to the Poisson-like form  (div sigma, grad v) = (f, v).
+// The assembly reads the strong-form RHS via exact_sol[idx_u]->laplacian(x),
+// using the same trick as the Poisson reference (where laplacian returns
+// Delta u = -f).  The exact analogue here is that laplacian must return
+// -f = -Delta^2 u_exact, so that the residual sign convention
+//   Res_i = ( -rhs_strong * phi_i - laplace_weak ) * w
+// produces the correct  Res = (f, v) - (divS, grad v).
 template <class type = double>
-class Function_Zero_on_boundary_7 : public Math::Function<type> {
-
+class Function_HM_u : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return sin(2.* pi * x[0]) * sin(2. * pi * x[1]);
+        return sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
     }
-
     std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = 2. * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
-        solGrad[1] = 2. * pi * sin(2. * pi * x[0]) * cos(2.* pi * x[1]);
-        return solGrad;
+        std::vector<type> g(x.size(), 0.);
+        g[0] = 2. * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
+        g[1] = 2. * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        return g;
     }
-
+    // Returns -f = -Delta^2 u_exact  (see explanation above).
     type laplacian(const std::vector<type>& x) const {
-        return -8. * pi * pi * sin(2.* pi * x[0]) * sin(2.*pi * x[1]);
+        return -64. * pi * pi * pi * pi
+              * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
     }
-
 private:
     static constexpr double pi = acos(-1.);
 };
 
+// sxx_exact = -u_xx = +4 pi^2 sin sin     (HM convention sigma = -Hess(u))
 template <class type = double>
-class Function_Zero_on_boundary_7_Laplacian : public Math::Function<type> {
-
+class Function_HM_sxx : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return -8.*pi*pi * sin(2.*pi*x[0]) * sin(2.*pi*x[1]);
+        return 4. * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
     }
-
     std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = -16. * pi * pi * pi * cos(2. * pi*x[0]) * sin(2. * pi*x[1]);
-        solGrad[1] = -16. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2.* pi * x[1]);
-        return solGrad;
+        std::vector<type> g(x.size(), 0.);
+        g[0] = 8. * pi * pi * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
+        g[1] = 8. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        return g;
     }
-
     type laplacian(const std::vector<type>& x) const {
-        return 64. * pi * pi * pi * pi * sin(2. * pi*x[0]) * sin(2. * pi * x[1]);
+        return -32. * pi * pi * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
     }
-
 private:
     static constexpr double pi = acos(-1.);
 };
 
-
+// sxy_exact = -u_xy = -4 pi^2 cos cos     (HM convention sigma = -Hess(u))
 template <class type = double>
-class Function_Zero_on_boundary_7_sxx : public Math::Function<type> {
-
+class Function_HM_sxy : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return -4. * pi * pi * sin(2.* pi * x[0]) * sin(2. * pi * x[1]);
+        return -4. * pi * pi * cos(2. * pi * x[0]) * cos(2. * pi * x[1]);
     }
-
     std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = -8. * pi * pi * pi * cos(2.* pi * x[0]) * sin(2. * pi * x[1]);
-        solGrad[1] = -8. * pi * pi * pi * sin(2.* pi * x[0]) * cos(2. * pi * x[1]);
-        return solGrad;
+        std::vector<type> g(x.size(), 0.);
+        g[0] =  8. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        g[1] =  8. * pi * pi * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
+        return g;
     }
-
     type laplacian(const std::vector<type>& x) const {
-        return 32. * pi * pi * pi * pi * sin(2.* pi * x[0]) * sin(2. * pi * x[1]);
+        return 32. * pi * pi * pi * pi * cos(2. * pi * x[0]) * cos(2. * pi * x[1]);
     }
-
 private:
     static constexpr double pi = acos(-1.);
 };
 
+// syy_exact = -u_yy = +4 pi^2 sin sin     (HM convention sigma = -Hess(u))
 template <class type = double>
-class Function_Zero_on_boundary_7_sxy : public Math::Function<type> {
-
+class Function_HM_syy : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return  4. * pi * pi * cos(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        return 4. * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
     }
-
     std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = -8. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
-        solGrad[1] = -8. * pi * pi * pi * cos(2. * pi * x[0]) * sin( 2. * pi * x[1] );
-        return solGrad;
+        std::vector<type> g(x.size(), 0.);
+        g[0] = 8. * pi * pi * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
+        g[1] = 8. * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
+        return g;
     }
-
     type laplacian(const std::vector<type>& x) const {
-        return -32. * pi * pi * pi * pi * cos(2.*pi*x[0]) * cos(2.*pi*x[1]);
+        return -32. * pi * pi * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
     }
-
 private:
     static constexpr double pi = acos(-1.);
 };
 
-template <class type = double>
-class Function_Zero_on_boundary_7_syy : public Math::Function<type> {
+} // namespace square_m05p05
+} // namespace Domains
 
-public:
-    type value(const std::vector<type>& x) const {
-        return -4. * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
+
+// =====================================================================
+//   Initial condition / Boundary condition  (mirror Poisson driver)
+// =====================================================================
+double Solution_set_initial_conditions_with_analytical_sol(
+        const MultiLevelProblem* ml_prob,
+        const std::vector<double>& x,
+        const char* name)
+{
+    Math::Function<double>* exact_sol =
+        ml_prob->get_ml_solution()->get_analytical_function(name);
+    return exact_sol->value(x);
+}
+
+// In Hermann--Miyoshi, only `u` carries an essential (Dirichlet) BC.
+// The components of sigma are NOT prescribed on the boundary -- they are
+// natural unknowns of the saddle-point system, and forcing them to their
+// analytical values destroys the convergence rates (it ends up enforcing
+// inconsistent / over-determined data, not stronger accuracy).
+bool Solution_set_boundary_conditions_all_dirichlet(
+        const MultiLevelProblem* ml_prob,
+        const std::vector<double>& x,
+        const char* name,
+        double& value,
+        const int faceName,
+        const double time)
+{
+    if (!strcmp(name, "u")) {
+        Math::Function<double>* exact_sol =
+            ml_prob->get_ml_solution()->get_analytical_function(name);
+        value = exact_sol->value(x);
+        return true;   // Dirichlet for u
     }
 
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = -8. * pi * pi * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
-        solGrad[1] = -8. * pi * pi * pi * sin(2. * pi * x[0]) * cos( 2. * pi*x[1] );
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-        return 32. * pi * pi * pi * pi * sin(2.*pi*x[0]) * sin(2.*pi*x[1]);
-    }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
-
-template <class type = double>
-class Function_Zero_on_boundary_7_f : public Math::Function<type> {
-
-public:
-    type value(const std::vector<type>& x) const {
-        return 0.;
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = 0.;
-        solGrad[1] = 0.;
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-        return 0.;
-    }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
-
-
-template <class type = double>
-class Function_Zero_on_boundary_7_u : public Math::Function<type> {
-
-public:
-    type value(const std::vector<type>& x) const {
-        return  x[0]* x[0]* x[0]* x[0] + x[1] * x[1]* x[1]* x[1] ;
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = 4. * x[0]* x[0]* x[0];
-        solGrad[1] = 4. * x[1]* x[1]* x[1];
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-        return 12. * ( x[0]* x[0] + x[1]* x[1] );
-    }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
-
-
-template <class type = double>
-class Function_Zero_on_boundary_9_SourceF : public Math::Function<type> {
-public:
-    type value(const std::vector<type>& x) const {
-        // This is Delta^2 u_exact, the source term 'f'.
-        return 64. * pi * pi * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = 128. * pi * pi * pi * pi * pi * cos(2. * pi * x[0]) * sin(2. * pi * x[1]);
-        solGrad[1] = 128. * pi * pi * pi * pi * pi * sin(2. * pi * x[0]) * cos(2. * pi * x[1]);
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-        // Not typically needed for source function, but could be Delta^3 u.
-        return -256. * pi * pi * pi * pi * pi * pi * sin(2. * pi * x[0]) * sin(2. * pi * x[1]);
-    }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
-
-
-
+    // sxx, sxy, syy : NO Dirichlet  (natural / free in the variational sense)
+    value = 0.;
+    return false;
 }
 
 
-}
-
-static Domains::square_m05p05::Function_Zero_on_boundary_7<> analytical_u_solution;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_sxx<> analytical_sxx_solution;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_sxy<> analytical_sxy_solution;
-static Domains::square_m05p05::Function_Zero_on_boundary_7_syy<> analytical_syy_solution;
-
-static Domains::square_m05p05::Function_Zero_on_boundary_9_SourceF<> source_function_f;
-
-
-double Solution_set_initial_conditions_with_analytical_sol(const MultiLevelProblem * ml_prob,
-                                                           const std::vector < double >& x,
-                                                           const char * SolName) {
-// //     double value = 1.;
-        double value ;
-
-    if (!strcmp(SolName, "u")) {
-        value = analytical_u_solution.value(x);
-    } else if (!strcmp(SolName, "sxx")) {
-        value = analytical_sxx_solution.value(x);
-    }else if (!strcmp(SolName, "sxy")) {
-        value = analytical_sxy_solution.value(x);
-    }else if (!strcmp(SolName, "syy")) {
-        value = analytical_syy_solution.value(x);
-    }
-    return value;
-}
-
-
-
-
-
-//====Set boundary condition-BEGIN==============================
-bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob,
-                                                       const std::vector < double >& x,
-                                                       const char SolName[],
-                                                       double & Value,
-                                                       const int facename,
-                                                       const double time) {
-
-  bool dirichlet = false; //dirichlet
-
-  if (!strcmp(SolName, "u")) {
-      // // // Math::Function <double> * u = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      // strcmp compares two string in lexiographic sense.
-    // // // Value = u -> value(x);
-          Value = analytical_u_solution.value(x);
-          dirichlet = true;
-
-  }
-  else if (!strcmp(SolName, "sxx")) {
-      // // // Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    // // // Value = sxx -> value(x);
-              Value = analytical_sxx_solution.value(x);
-              dirichlet = true;
-  }
-    else if (!strcmp(SolName, "sxy")) {
-      // // // Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    // // // Value = sxy -> value(x);
-                Value = analytical_sxy_solution.value(x);
-                dirichlet = true;
-  }
-    else if (!strcmp(SolName, "syy")) {
-      // // // Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    // // // Value = syy -> value(x);
-                Value = analytical_syy_solution.value(x);
-                dirichlet = true;
-  }
-
-  // // // double value = 0.;  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  // Value = 0.;
-
-  return dirichlet;
-}
-//====Set boundary condition-END==============================
-
-
-
+// =====================================================================
+//   Interface to the assembly  (mirror Poisson driver)
+// =====================================================================
 template < class system_type, class real_num, class real_num_mov >
-void System_assemble_interface_Biharmonic(MultiLevelProblem& ml_prob) {
+void System_assemble_interface_HermannMiyoshi(MultiLevelProblem& ml_prob)
+{
     const unsigned current_system_number = ml_prob.get_current_system_number();
 
-    std::vector< Unknown > unknowns = ml_prob.get_system< system_type >(current_system_number).get_unknown_list_for_assembly();
+    std::vector< Unknown > unknowns =
+        ml_prob.get_system< system_type >(current_system_number)
+               .get_unknown_list_for_assembly();
 
-    std::vector< Math::Function< double > * > source_funcs_for_assembly(1);
-    source_funcs_for_assembly[0] = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs;
+    // Pull the analytical functions associated with each unknown.
+    std::vector< Math::Function< double > * > exact_sol(unknowns.size());
+    for (unsigned u = 0; u < exact_sol.size(); u++) {
+        exact_sol[u] = ml_prob.get_ml_solution()
+                              ->get_analytical_function(unknowns[u]._name.c_str());
+    }
 
-    std::vector < std::vector < /*const*/ elem_type_templ_base<real_num, real_num_mov> * > > elem_all;
+    // FE quadrature objects
+    std::vector < std::vector < /*const*/ elem_type_templ_base<real_num,     real_num_mov> * > > elem_all;
     ml_prob.get_all_abstract_fe(elem_all);
-
     std::vector < std::vector < /*const*/ elem_type_templ_base<real_num_mov, real_num_mov> * > > elem_all_for_domain;
     ml_prob.get_all_abstract_fe(elem_all_for_domain);
 
-
-    /*NAMESPACE_FOR_BIHARMONIC_HM_nonauto_conv*/karthik::biharmonic_HM_nonauto_conv::AssembleHermannMiyoshiProblem< system_type, real_num, real_num_mov > (
+    System_assemble_flexible_HermannMiyoshi_With_Manufactured_Sol< system_type, real_num, real_num_mov >(
         elem_all,
         elem_all_for_domain,
         ml_prob.GetQuadratureRuleAllGeomElems(),
@@ -330,155 +227,171 @@ void System_assemble_interface_Biharmonic(MultiLevelProblem& ml_prob) {
         ml_prob.GetMLMesh(),
         ml_prob.get_ml_solution(),
         unknowns,
-        source_funcs_for_assembly
-    );
+        exact_sol);
 }
 
-/**
- * @brief Solution generation class for running the biharmonic problem on single mesh levels.
- */
+
+// =====================================================================
+//   Solution generation class  (mirror Poisson driver)
+//
+//   In Poisson, one system per scalar unknown is created. Here we
+//   build ONE coupled system that owns all four unknowns.
+// =====================================================================
 template < class real_num >
 class Solution_generation_1 : public Solution_generation_single_level {
 public:
     const MultiLevelSolution run_on_single_level(
         MultiLevelProblem & ml_prob,
+        MultiLevelMesh & ml_mesh,
+        const unsigned i,
+        const std::vector< Unknown > & unknowns,
+        const std::vector< Math::Function< double > * > & exact_sol,
+        const MultiLevelSolution::InitFuncMLProb     SetInitialCondition_in,
+        const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
+        const bool my_solution_generation_has_equation_solve) const;
+};
+
+
+template < class real_num >
+const MultiLevelSolution
+Solution_generation_1< real_num >::run_on_single_level(
+        MultiLevelProblem & ml_prob,
         MultiLevelMesh & ml_mesh_single_level,
         const unsigned lev,
         const std::vector< Unknown > & unknowns,
-        const std::vector< Math::Function< double > * > & exact_sol_functions,
-        const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
+        const std::vector< Math::Function< double > * > & exact_sol,
+        const MultiLevelSolution::InitFuncMLProb     SetInitialCondition_in,
         const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
-        const bool my_solution_generation_has_equation_solve
-    ) const;
-};
-
-template < class real_num >
-const MultiLevelSolution Solution_generation_1< real_num >::run_on_single_level(
-    MultiLevelProblem & ml_prob,
-    MultiLevelMesh & ml_mesh_single_level,
-    const unsigned lev,
-    const std::vector< Unknown > & unknowns,
-    const std::vector< Math::Function< double > * > & exact_sol_functions,
-    const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
-    const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
-    const bool my_solution_generation_has_equation_solve
-) const {
-    // Mesh Setup for the current level
-    unsigned numberOfUniformLevels = lev + 1;
+        const bool my_solution_generation_has_equation_solve) const
+{
+    //Mesh - BEGIN ==================
+    unsigned numberOfUniformLevels   = lev + 1;
     unsigned numberOfSelectiveLevels = 0;
-    ml_mesh_single_level.RefineMesh(numberOfUniformLevels, numberOfUniformLevels + numberOfSelectiveLevels, NULL);
+    ml_mesh_single_level.RefineMesh(numberOfUniformLevels,
+                                    numberOfUniformLevels + numberOfSelectiveLevels, NULL);
     ml_mesh_single_level.EraseCoarseLevels(numberOfUniformLevels - 1);
-
     ml_mesh_single_level.PrintInfo();
 
-    if (ml_mesh_single_level.GetNumberOfLevels() != 1) { std::cout << "Need single level here" << std::endl; abort(); }
+    if (ml_mesh_single_level.GetNumberOfLevels() != 1) {
+        std::cout << "Need single level here" << std::endl;
+        abort();
+    }
+    //Mesh - END ==================
 
-    // Solution Setup for the current level
-    MultiLevelSolution ml_sol_single_level(&ml_mesh_single_level);
+
+    //Solution - BEGIN ==================
+    MultiLevelSolution ml_sol_single_level(& ml_mesh_single_level);
     ml_sol_single_level.SetWriter(VTK);
     ml_sol_single_level.GetWriter()->SetDebugOutput(true);
 
-    ml_prob.SetMultiLevelMeshAndSolution(&ml_sol_single_level);
+    ml_prob.SetMultiLevelMeshAndSolution(& ml_sol_single_level);
+    //Solution - END ==================
 
-    // Add all solutions (u, sxx, sxy, syy) and set their analytical functions
-    for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
-        ml_sol_single_level.AddSolution(unknowns[u_idx]._name.c_str(), unknowns[u_idx]._fe_family, unknowns[u_idx]._fe_order, unknowns[u_idx]._time_order, unknowns[u_idx]._is_pde_unknown);
-        ml_sol_single_level.set_analytical_function(unknowns[u_idx]._name.c_str(), exact_sol_functions[u_idx]);
-        ml_sol_single_level.Initialize(unknowns[u_idx]._name.c_str(), SetInitialCondition_in, &ml_prob);
+
+    // ======= Solution, Initialize - BEGIN =================
+    for (unsigned u = 0; u < unknowns.size(); u++) {
+        ml_sol_single_level.AddSolution(
+            unknowns[u]._name.c_str(),
+            unknowns[u]._fe_family,
+            unknowns[u]._fe_order,
+            unknowns[u]._time_order,
+            unknowns[u]._is_pde_unknown);
+        ml_sol_single_level.set_analytical_function(
+            unknowns[u]._name.c_str(), exact_sol[u]);
+        ml_sol_single_level.Initialize(
+            unknowns[u]._name.c_str(),
+            SetInitialCondition_in, & ml_prob);
     }
+    // ======= Solution, Initialize - END   ==================
+
 
     if (my_solution_generation_has_equation_solve) {
+
         ml_prob.get_systems_map().clear();
 
-        // Attach boundary condition function and generate boundary data for ALL unknowns
+        // ======= Boundary conditions =================
         ml_sol_single_level.AttachSetBoundaryConditionFunction(SetBoundaryCondition_in);
-        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
-            ml_sol_single_level.GenerateBdc(unknowns[u_idx]._name.c_str(), (unknowns[u_idx]._time_order == 0) ? "Steady" : "Time_dependent", &ml_prob);
+        for (unsigned u = 0; u < unknowns.size(); u++) {
+            ml_sol_single_level.GenerateBdc(
+                unknowns[u]._name.c_str(),
+                (unknowns[u]._time_order == 0) ? "Steady" : "Time_dependent",
+                & ml_prob);
         }
 
-        // --- Define the SINGLE Coupled System ---
-        NonLinearImplicitSystem & system = ml_prob.add_system< NonLinearImplicitSystem > (ml_prob.get_app_specs_pointer()->_system_name);
+        // ======= Single coupled LinearImplicitSystem =================
+        const std::string sys_name = "Biharmonic";
+        LinearImplicitSystem & system =
+            ml_prob.add_system< LinearImplicitSystem >(sys_name);
 
-        // Add ALL unknowns ('u', 'sxx', 'sxy', 'syy') to this SINGLE coupled system
-        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
-            system.AddSolutionToSystemPDE(unknowns[u_idx]._name.c_str());
+        for (unsigned u = 0; u < unknowns.size(); u++) {
+            system.AddSolutionToSystemPDE(unknowns[u]._name.c_str());
         }
-        // Set the list of unknowns for assembly (the full list)
         system.set_unknown_list_for_assembly(unknowns);
 
-        // Attach the custom coupled assembly function
-        system.SetAssembleFunction(System_assemble_interface_Biharmonic< NonLinearImplicitSystem, real_num, double >);
+        system.SetAssembleFunction(
+            System_assemble_interface_HermannMiyoshi< LinearImplicitSystem, real_num, double >);
 
-        // Set the current system number
         ml_prob.set_current_system_number(0);
 
-        // Initialize and solve the system
         system.init();
         system.ClearVariablesToBeSolved();
         system.AddVariableToBeSolved("All");
-        system.SetOuterSolver(PREONLY);
+
+        system.SetOuterSolver(PREONLY /*GMRES*/);
         system.MGsolve();
     }
 
-    // Print Solutions to VTK
-    ml_sol_single_level.SetWriter(VTK);
-    ml_sol_single_level.GetWriter()->SetDebugOutput(true);
 
-        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
-        std::vector < std::string > variablesToBePrinted;
-        variablesToBePrinted.push_back(unknowns[u_idx]._name);
-        std::ostringstream output_filename;
-        output_filename << unknowns[u_idx]._name << "_coupled_FE" << unknowns[u_idx]._fe_order << "_level" << lev;
-
-
-    //        // Map FE order to file-family enum used by FEMuS writer
-    // // (adjust mapping constants if your build uses different enum names)
-    // int file_family_for_output = FILES_CONTINUOUS_BIQUADRATIC; // default
-    // if (unknowns[u_idx]._fe_order == SECOND) {
-    //     file_family_for_output = FILES_CONTINUOUS_LINEAR; // Q1
-    // } else if (unknowns[u_idx]._fe_order == SECOND) {
-    //     file_family_for_output = FILES_CONTINUOUS_BIQUADRATIC; // Q2
-    // } // extend if you support higher orders
-
-
-
-        ml_sol_single_level.GetWriter()->Write(output_filename.str(), ml_prob.GetFilesHandler()->GetOutputPath(), fe_fams_for_files[ FILES_CONTINUOUS_BIQUADRATIC ], variablesToBePrinted, lev);
+    // ======= Print =================
+    for (unsigned u = 0; u < unknowns.size(); u++) {
+        std::vector< std::string > variablesToBePrinted;
+        variablesToBePrinted.push_back(unknowns[u]._name);
+        ml_sol_single_level.GetWriter()->Write(
+            unknowns[u]._name,
+            ml_prob.GetFilesHandler()->GetOutputPath(),
+            fe_fams_for_files[ FILES_CONTINUOUS_BIQUADRATIC ],
+            variablesToBePrinted, lev);
     }
 
-// // //     ml_sol_single_level.GetWriter()->Write("All_solutions_coupled", ml_prob.GetFilesHandler()->GetOutputPath(), fe_fams_for_files[ FILES_CONTINUOUS_BIQUADRATIC ], {"u", "sxx", "sxy", "syy"}, lev);
 
     return ml_sol_single_level;
 }
 
 
-int main(int argc, char** args) {
-
+// =====================================================================
+//   main  (mirror Poisson driver)
+// =====================================================================
+int main(int argc, char** args)
+{
     // ======= Init ==========================
     FemusInit mpinit(argc, args, MPI_COMM_WORLD);
 
     // ======= Problem ========================
     MultiLevelProblem ml_prob;
 
-    // ======= Files - BEGIN =========================
-    const bool use_output_time_folder = false;
-    const bool redirect_cout_to_file = false;
+    // ======= Files - BEGIN  =========================
     Files files;
+    const bool use_output_time_folder = false;
+    const bool redirect_cout_to_file  = false;
     files.CheckIODirectories(use_output_time_folder);
     files.RedirectCout(redirect_cout_to_file);
     ml_prob.SetFilesHandler(&files);
-    // ======= Files - END =========================
+    // ======= Files - END  =========================
+
 
     // ======= Mesh, Coarse, file - BEGIN ========================
     MultiLevelMesh ml_mesh;
-
     const std::string relative_path_to_build_directory = "../../../../../";
-    const std::string input_file_path = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";
-    /*square_-0p5-0p5x-0p5-0p5_divisions_2x2.medsquare_-0p5-0p5x-0p5-0p5_divisions_1x1_triangles.med*/
-    const std::string input_mesh_filename = "square_-0p5-0p5x-0p5-0p5_divisions_2x2.med";
-    const std::string input_file_total = input_file_path + input_mesh_filename;
+    const std::string input_file =
+        relative_path_to_build_directory + Files::mesh_folder_path()
+      + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/"
+        "square_-0p5-0p5x-0p5-0p5_divisions_2x2.med";
 
-    ml_mesh.ReadCoarseMesh(input_file_total);
+    std::ostringstream mystream; mystream << "./" << input_file;
+    const std::string infile = mystream.str();
+    ml_mesh.ReadCoarseMesh(infile);
     // ======= Mesh, Coarse, file - END ========================
+
 
     // ======= Quad Rule - BEGIN ========================
     std::string fe_quad_rule("seventh");
@@ -486,93 +399,81 @@ int main(int argc, char** args) {
     ml_prob.set_all_abstract_fe_AD_or_not();
     // ======= Quad Rule - END ========================
 
-    // ======= Convergence study setup - BEGIN ========================
 
-    // Mesh, Number of refinements
-    unsigned max_number_of_meshes = 7;
-    if (ml_mesh.GetDimension() == 3){
-        max_number_of_meshes = 6;
-    }
+    // ======= Convergence study - BEGIN ========================
+    unsigned max_number_of_meshes = 6;
+    if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 4;
 
-    // Auxiliary mesh, all levels - for incremental refinement
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
-    ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(input_file_total);
+    ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(infile);
 
-    // Solution generation class
     Solution_generation_1< double > my_solution_generation;
-
-    // Solve Equation or only Approximation Theory
     const bool my_solution_generation_has_equation_solve = true;
-    // ======= Convergence study setup - END ========================
+
 
     // ======= Unknowns - BEGIN ========================
-    std::vector< Unknown > unknowns(4); // Four unknowns: u, sxx, sxy, syy
+    //
+    //   unknowns[0] = "u"
+    //   unknowns[1] = "sxx"
+    //   unknowns[2] = "sxy"
+    //   unknowns[3] = "syy"
+    //
+    std::vector< Unknown > unknowns(4);
 
+    unknowns[0]._name           = "u";
+    unknowns[1]._name           = "sxx";
+    unknowns[2]._name           = "sxy";
+    unknowns[3]._name           = "syy";
 
-    // unknowns.push_back(Unknown("u", LAGRANGE));
-    // unknowns.push_back(Unknown("sxx", LAGRANGE));
-    // unknowns.push_back(Unknown("sxy", LAGRANGE));
-    // unknowns.push_back(Unknown("syy", LAGRANGE));
-
-
-
-    // Setup for 'u'
-    unknowns[0]._name = "u";
-    unknowns[1]._name = "sxx";
-    unknowns[2]._name = "sxy";
-    unknowns[3]._name = "syy";
-
-    unknowns[0]._fe_family = LAGRANGE;
-    unknowns[0]._fe_order = SECOND;
-    unknowns[0]._time_order = 0;
-    unknowns[0]._is_pde_unknown = true;
-
-
-    for (unsigned int unk=1; unk < unknowns.size(); unk++){
-    unknowns[unk]._fe_family = LAGRANGE;
-    unknowns[unk]._fe_order = SECOND;
-    unknowns[unk]._time_order = 0;
-    unknowns[unk]._is_pde_unknown = true;
+    for (unsigned k = 0; k < unknowns.size(); k++) {
+        unknowns[k]._fe_family      = LAGRANGE;
+        unknowns[k]._fe_order       = SECOND;
+        unknowns[k]._time_order     = 0;
+        unknowns[k]._is_pde_unknown = true;
     }
-
     // ======= Unknowns - END ========================
 
- Domains::square_m05p05::Function_Zero_on_boundary_7<> analytical_u_solution;
- Domains::square_m05p05::Function_Zero_on_boundary_7_sxx<> analytical_sxx_solution;
- Domains::square_m05p05::Function_Zero_on_boundary_7_sxy<> analytical_sxy_solution;
- Domains::square_m05p05::Function_Zero_on_boundary_7_syy<> analytical_syy_solution;
 
- Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian<> source_function_f;
+    // ======= Unknowns, exact solutions - BEGIN ================
+    //
+    //   exact_sol[0] -> u_exact   (its ->laplacian returns -f, used as strong-form
+    //                              RHS in the u-row of the assembly)
+    //   exact_sol[1..3] -> sxx, sxy, syy analytical functions, used by
+    //                     FE_convergence for L2/H1 norm computation
+    //
+    Domains::square_m05p05::Function_HM_u<>   u_exact_func;
+    Domains::square_m05p05::Function_HM_sxx<> sxx_exact_func;
+    Domains::square_m05p05::Function_HM_sxy<> sxy_exact_func;
+    Domains::square_m05p05::Function_HM_syy<> syy_exact_func;
 
-    // ======= Unknowns, Analytical functions - BEGIN ================
-    std::vector< Math::Function< double > * > unknowns_analytical_functions_Needed_for_absolute( unknowns.size() );
-    unknowns_analytical_functions_Needed_for_absolute[0] = &analytical_u_solution;
-    unknowns_analytical_functions_Needed_for_absolute[1] = &analytical_sxx_solution;
-    unknowns_analytical_functions_Needed_for_absolute[2] = &analytical_sxy_solution;
-    unknowns_analytical_functions_Needed_for_absolute[3] = &analytical_syy_solution;
-    // ======= Unknowns, Analytical functions - END ================
+    std::vector< Math::Function< double > * >
+        unknowns_analytical_functions_Needed_for_absolute(unknowns.size());
+    unknowns_analytical_functions_Needed_for_absolute[0] = & u_exact_func;
+    unknowns_analytical_functions_Needed_for_absolute[1] = & sxx_exact_func;
+    unknowns_analytical_functions_Needed_for_absolute[2] = & sxy_exact_func;
+    unknowns_analytical_functions_Needed_for_absolute[3] = & syy_exact_func;
+    // ======= Unknowns, exact solutions - END ================
 
-    // ======= System Specifics for Coupled Problem - BEGIN ==================
+
+    // ======= app specs ================
     system_specifics app_specs;
-    app_specs._system_name = "Biharmonic";
-    app_specs._assemble_function = System_assemble_interface_Biharmonic<NonLinearImplicitSystem, double, double>;
-    app_specs._assemble_function_for_rhs = &source_function_f;
-    app_specs._true_solution_function = &analytical_u_solution;
-    app_specs._boundary_conditions_types_and_values = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
+    app_specs._assemble_function_for_rhs = & u_exact_func;   // (its ->laplacian = -f)
     ml_prob.set_app_specs_pointer(&app_specs);
-    // ======= System Specifics for Coupled Problem - END ==================
+    // ======= app specs - END ==========
 
-    // Various choices for convergence study (L2/H1 norms, etc.) - BEGIN ==================
-    std::vector < bool > convergence_rate_computation_method_Flag = {true, false}; // Incremental method, Exact solution method
-    std::vector < bool > volume_or_boundary_Flag = {true, true}; //volume, boundary
-    std::vector < bool > sobolev_norms_Flag = {true, true};  // only L2, only H1
-    // Various choices for convergence study (L2/H1 norms, etc.) - END ==================
 
-    // ======= Perform Convergence Study - BEGIN ========================
+    // Various choices - BEGIN ================
+    std::vector< bool > convergence_rate_computation_method_Flag = {true, false};
+    std::vector< bool > volume_or_boundary_Flag                  = {true, true};
+    std::vector< bool > sobolev_norms_Flag                       = {true, true};
+    // Various choices - END ================
+
+
+    // ======= Convergence study ========================
     FE_convergence<>::convergence_study(
         ml_prob,
         ml_mesh,
-        & ml_mesh_all_levels_Needed_for_incremental,
+        & ml_mesh_all_levels_Needed_for_incremental /*NULL*/,
         max_number_of_meshes,
         convergence_rate_computation_method_Flag,
         volume_or_boundary_Flag,
@@ -582,11 +483,7 @@ int main(int argc, char** args) {
         unknowns,
         unknowns_analytical_functions_Needed_for_absolute,
         Solution_set_initial_conditions_with_analytical_sol,
-        SetBoundaryCondition_bc_all_dirichlet_homogeneous
-    );
-    // ======= Perform Convergence Study - END ========================
+        Solution_set_boundary_conditions_all_dirichlet);
 
     return 0;
 }
-
-

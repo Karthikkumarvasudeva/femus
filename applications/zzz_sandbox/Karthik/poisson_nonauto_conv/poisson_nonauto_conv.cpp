@@ -263,15 +263,16 @@ int main(int argc, char** args) {
 
   const std::string relative_path_to_build_directory =  "../../../../";
 
-   const std::string input_file = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/square_-0p5-0p5x-0p5-0p5_divisions_2x2.med";
-
+   const std::string input_file_path = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";
+   const std::string input_mesh_filename = "square_-0p5-0p5x-0p5-0p5_divisions_2x2.med";
+const std::string input_file_total = input_file_path + input_mesh_filename;
     // ======= Mesh, Coarse, file - END ========================
 
     // ======= Mesh, Coarse - BEGIN ========================
-    std::ostringstream mystream; mystream << "./"  << input_file;
-    const std::string infile = mystream.str();
+//     std::ostringstream mystream; mystream << "./"  << input_file;
+//     const std::string infile = mystream.str();
 
-    ml_mesh.ReadCoarseMesh(infile);
+    ml_mesh.ReadCoarseMesh(input_file_total);
     // ======= Mesh, Coarse - END ========================
 
     // ======= Quad Rule - BEGIN ========================
@@ -292,7 +293,7 @@ int main(int argc, char** args) {
     ///set coarse storage mesh
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
 
-    ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(infile);
+    ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(input_file_total);
     // )Auxiliary mesh, all levels - END  ================
 
     // )======= Solution generation class - BEGIN ========================

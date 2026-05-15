@@ -36,6 +36,11 @@
 
 using namespace femus;
 
+static constexpr double alpha_0 = 0.001 ;
+static constexpr double alpha_1 = 0.001;
+static constexpr double alpha_2 = 0.001;
+
+
 
 namespace karthik {
   
@@ -1083,10 +1088,6 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
   KK->zero(); // Set to zero all the entries of the Global Matrix
 
 
-double alpha = .001 ;
-double nu =  0. /* Poisson ratio value */;
-double beta = 0.001;
-double gamma = 0.001;
 
 
   for (int iel = msh->GetElementOffset(iproc); iel < msh->GetElementOffset(iproc + 1); iel++) {
@@ -1331,7 +1332,7 @@ double gamma = 0.001;
           Laplace_wsxyd   +=  - phi_x[i * dim + jdim] * solwsxydGauss_x[jdim];
           Laplace_wsyyd   +=  - phi_x[i * dim + jdim] * solwsyydGauss_x[jdim];
         }
-        adept::adouble M_w_comb = M_w + beta * phi[i] * solwGauss + gamma * Laplace_w;
+        adept::adouble M_w_comb = M_w + alpha_0 * phi[i] * solwGauss + alpha_1 * Laplace_w;
         double pi = acos(-1.);
 
     adept::adouble Bxxu = 0.;
@@ -1453,7 +1454,7 @@ double gamma = 0.001;
      aResw[i]     += (Bwxxu + M_wsxxd  ) * weight;
      aReswsxxd[i] += (Bwxyu + M_wsxyd) * weight;
      aReswsxyd[i] += (Bwyyu + M_wsyyd) * weight;
-     aReswsyyd[i] += (M_u + Bxxd + Bxyd + Byyd + M_w_comb + udr_term) * weight;
+     aReswsyyd[i] += (M_u + Bxxd + Bxyd + Byyd + M_w_comb + alpha_2 * (- Bwxxud - Bwxyud - Bwyyud) + udr_term) * weight;
       } // end phi_i loop
 
     } // end gauss point loop
