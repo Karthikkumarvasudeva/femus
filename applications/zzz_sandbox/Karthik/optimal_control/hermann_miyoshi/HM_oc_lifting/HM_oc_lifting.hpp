@@ -36,16 +36,16 @@
 
 using namespace femus;
 
-static constexpr double alpha_0 = 0.001 ;
-static constexpr double alpha_1 = 0.001;
-static constexpr double alpha_2 = 0.001;
+static constexpr double alpha_0 = 0.000001 ;
+static constexpr double alpha_1 = 0.000001;
+static constexpr double alpha_2 = 0.000001;
 
 
 
 namespace karthik {
-  
+
   class biharmonic_HM_oc_lifting {
-    
+
   public:
 
 
@@ -1092,10 +1092,10 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
 
   for (int iel = msh->GetElementOffset(iproc); iel < msh->GetElementOffset(iproc + 1); iel++) {
 
-    short unsigned ielGeom = msh->GetElementType(iel); 
+    short unsigned ielGeom = msh->GetElementType(iel);
 
 // // //     unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
-    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_sxx);    // number of solution element dofs
+    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
 
 
 
@@ -1178,7 +1178,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
     }
 
     // local storage of coordinates
-    for (unsigned i = 0; i < nDofs; i++) {
+    for (unsigned i = 0; i < nDofs2; i++) {
       unsigned xDof  = msh->GetSolutionDof(i, iel, xType); // global to global mapping between coordinates node and coordinate dof
 
       for (unsigned jdim = 0; jdim < dim; jdim++) {
@@ -1332,7 +1332,16 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
           Laplace_wsxyd   +=  - phi_x[i * dim + jdim] * solwsxydGauss_x[jdim];
           Laplace_wsyyd   +=  - phi_x[i * dim + jdim] * solwsyydGauss_x[jdim];
         }
-        adept::adouble M_w_comb = M_w + alpha_0 * phi[i] * solwGauss + alpha_1 * Laplace_w;
+        // M_w_comb collects three optimality-equation contributions that all
+        // multiply phi[i] in the discrete row:
+        //   (i)   ( w, phi )                 -- tracking-of-w part of (u+w-u_D, dw)
+        //   (ii)  alpha_0 ( w, phi )          -- L^2 regularization
+        //   (iii) alpha_1 ( grad w, grad phi) -- H^1 regularization
+        //
+        // The variable Laplace_w is defined with a leading minus sign
+        // (Laplace_w = - phi_x . solw_x), so to get the *plus* (grad w, grad phi)
+        // contribution from the cost variation we multiply by  -alpha_1 .
+        adept::adouble M_w_comb = M_w + alpha_0 * phi[i] * solwGauss - alpha_1 * Laplace_w;
         double pi = acos(-1.);
 
     adept::adouble Bxxu = 0.;
@@ -1356,38 +1365,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
     adept::adouble Bwxyu = 0.;
     adept::adouble Bwyyu = 0.;
 
-       // if (dim == 2) {
 
-        // // // Bxxu += phi_x[i * dim] * soluGauss_x[0] + nu * phi_x[i * dim + 1] * soluGauss_x[1];
-        // // //
-        // // // Bxyu += ( 1. - nu ) * ( phi_x[i * dim] * soluGauss_x[1] + phi_x[i * dim + 1 ] * soluGauss_x[0] );
-        // // //
-        // // // Byyu += nu * phi_x[i * dim] * soluGauss_x[0] + phi_x[i * dim + 1] * soluGauss_x[1];
-        // // //
-        // // // Bxx += phi_x[i * dim] * solsxxGauss_x[0];
-        // // //
-        // // // Bxy +=( (phi_x[i * dim + 1 ] * solsxyGauss_x[0] + phi_x[i * dim ] * solsxyGauss_x[1]) );
-        // // // Byy +=  phi_x[i * dim + 1] * solsyyGauss_x[1];
-        // // //
-        // // // Bxxud += phi_x[i * dim] * soludGauss_x[0] + nu * phi_x[i * dim + 1] * soludGauss_x[1];
-        // // //
-        // // // Bxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
-        // // //
-        // // // Byyud += nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
-        // // //
-        // // // Bxxd += phi_x[i * dim] * solsxxdGauss_x[0] + nu * phi_x[i * dim + 1] * solsxxdGauss_x[1];
-        // // //
-        // // // Bxyd +=  ( 1. - nu ) * ( phi_x[i * dim] * solsxydGauss_x[1] + phi_x[i * dim + 1] * solsxydGauss_x[0] );
-        // // //
-        // // // Byyd +=  nu * phi_x[i * dim] * solsyydGauss_x[0] + phi_x[i * dim + 1] * solsyydGauss_x[1];
-        // // //
-        // // // Bwxxud += phi_x[i * dim] * soludGauss_x[0] + nu * phi_x[i * dim + 1] * soludGauss_x[1];
-        // // //
-        // // // Bwxyud += ( 1. - nu ) * ( phi_x[i * dim] * soludGauss_x[1] + phi_x[i * dim + 1 ] * soludGauss_x[0] );
-        // // //
-        // // // Bwyyud += nu * phi_x[i * dim] * soludGauss_x[0] + phi_x[i * dim + 1] * soludGauss_x[1];
-
-    // }
 
         Bxxu += phi_x[i * dim] * soluGauss_x[0] ;
 
@@ -1426,35 +1404,138 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
         Bwyyud += phi_x[i * dim + 1] * solwsyydGauss_x[1];
 
 
+        // ----- target u_D and source f for the state PDE -----
+        // udr_term  =  (u_D, phi_i)         pulled from app_specs._assemble_function_for_rhs
         adept::adouble udr_term = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->value(xGauss) * phi[i];
 
 
-                  adept::adouble f_u_val = 0.0;
-{
-    static constexpr double pi = acos(-1.);
-    const adept::adouble x = xGauss[0];
-    const adept::adouble y = xGauss[1];
+        // ----- f_u_val: source for state PDE  Delta^2(u + w) = -f_u_val -----
+        // Now u = c(x) c(y) (trig clamped), w = g(x) q(y) (polynomial).
+        //
+        //   c(s) = cos^2(pi s),  c''(s) = -2 pi^2 cos(2 pi s)
+        //   q(s) = (1/4 - s^2)^2,  q''(s) = -1 + 12 s^2
+        //   g(s) = -4 s^4 - 4 s^3 + 2 s^2 + 3 s + 3/4,  g''(s) = -48 s^2 - 24 s + 4
+        //
+        //   Delta^2[c(x) c(y)] = 8 pi^4 [cos(2 pi x) c(y) + c(x) cos(2 pi y)
+        //                                + cos(2 pi x) cos(2 pi y)]
+        //   Delta^2[g(x) q(y)] = -96 q(y) + 2 g''(x) q''(y) + 24 g(x)
+        //
+        //   f_u_val = -[Delta^2 u + Delta^2 w]
+        adept::adouble f_u_val = 0.0;
+        {
+            const double xg = xGauss[0];
+            const double yg = xGauss[1];
+            const double c_x   = cos(pi * xg); const double c_x2 = c_x * c_x;
+            const double c_y   = cos(pi * yg); const double c_y2 = c_y * c_y;
+            const double cos2x = cos(2. * pi * xg);
+            const double cos2y = cos(2. * pi * yg);
+            const double q_y   = (0.25 - yg*yg) * (0.25 - yg*yg);
+            const double qpp_y = -1. + 12.*yg*yg;
+            const double g_x   = -4.*xg*xg*xg*xg - 4.*xg*xg*xg + 2.*xg*xg + 3.*xg + 0.75;
+            const double gpp_x = -48.*xg*xg - 24.*xg + 4.;
 
-    f_u_val = 2. * 4. * pi * pi * pi * pi * (cos(pi * x) * cos(pi * x));
-}
+            const double lap2_u = 8. * pi * pi * pi * pi *
+                            (cos2x * c_y2 + c_x2 * cos2y + cos2x * cos2y);
+            const double lap2_w = -96. * q_y + 2. * gpp_x * qpp_y + 24. * g_x;
 
-// // //         adept::adouble F_term_yd = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs->laplacian_yd(xGauss) * phi[i];
+            f_u_val = -(lap2_u + lap2_w);
+        }
 
-        // System residuals - signs adjusted to match matrix form
-     aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud - f_u_val) * weight;
-     aRessxx[i]   += (Bxxu + M_sxx ) * weight;
-     aRessxy[i]   += (Bxyu + M_sxy ) * weight;
-     aRessyy[i]   += (Byyu + M_syy ) * weight;
 
-     aResud[i]    += (M_u + Bxxd + Bxyd + Byyd + M_w + udr_term) * weight;
-     aRessxxd[i]  += (Bxxud + M_sxxd) * weight;
-     aRessxyd[i]  += (Bxyud + M_sxyd) * weight;
-     aRessyyd[i]  += (Byyud + M_syyd) * weight;
+        // ----- g_opt_val: fictitious source on the optimality equation -----
+        // Required so that the manufactured w satisfies the optimality.
+        // Derivation: the assembly's optimality row enforces (at solution)
+        //   (u + w - u_D) + alpha_0 w - alpha_1 Delta w
+        //     - Delta^2 lambda + alpha_2 Delta^2 w - g_opt = 0.
+        // Substituting the adjoint identity  u + w - u_D = Delta^2 lambda:
+        //   g_opt = alpha_0 w - alpha_1 Delta w + alpha_2 Delta^2 w
+        // (note the PLUS on the alpha_2 term).
+        adept::adouble g_opt_val = 0.0;
+        {
+            const double xg = xGauss[0];
+            const double yg = xGauss[1];
+            const double q_y   = (0.25 - yg*yg) * (0.25 - yg*yg);
+            const double qpp_y = -1. + 12.*yg*yg;
+            const double g_x   = -4.*xg*xg*xg*xg - 4.*xg*xg*xg + 2.*xg*xg + 3.*xg + 0.75;
+            const double gpp_x = -48.*xg*xg - 24.*xg + 4.;
 
-     aResw[i]     += (Bwxxu + M_wsxxd  ) * weight;
-     aReswsxxd[i] += (Bwxyu + M_wsxyd) * weight;
-     aReswsxyd[i] += (Bwyyu + M_wsyyd) * weight;
-     aReswsyyd[i] += (M_u + Bxxd + Bxyd + Byyd + M_w_comb + alpha_2 * (- Bwxxud - Bwxyud - Bwyyud) + udr_term) * weight;
+            const double w_val  = g_x * q_y;
+            const double lap_w  = gpp_x * q_y + g_x * qpp_y;
+            const double lap2_w = -96. * q_y + 2. * gpp_x * qpp_y + 24. * g_x;
+
+            g_opt_val = (alpha_0 * w_val - alpha_1 * lap_w + alpha_2 * lap2_w) * phi[i];
+        }
+
+
+        // ====================================================================
+        //   System residuals (12 equations, AD-recording form).
+        //   Sign convention: each line accumulates the LHS of the weak
+        //   equation with the SOURCE TERM CARRIED WITH A MINUS SIGN; the
+        //   global "-aRes" flip at scatter time then puts sources on the
+        //   RHS of the linear system, matching the working state-only HM
+        //   reference.
+        // ====================================================================
+
+        // -------- STATE block (4 eqs) --------
+        //  (1) state PDE row (test = delta lambda_u, residual aResu)
+        //         (grad phi, div(sigma + sigma_w)) = -(f, phi)
+        aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud - f_u_val) * weight;
+
+        //  (2)-(4) state sigma-Hessian relations
+        //         (sigma_alpha, tau) + (d_alpha u, d_alpha tau) = 0
+        aRessxx[i]   += (Bxxu + M_sxx) * weight;
+        aRessxy[i]   += (Bxyu + M_sxy) * weight;    // M_sxy carries the factor 2
+        aRessyy[i]   += (Byyu + M_syy) * weight;
+
+        // -------- ADJOINT block (4 eqs) --------
+        //  (5) adjoint PDE row (test = delta u, residual aResud)
+        //         (grad phi, div lambda_sigma) = -(u + w - u_D, phi)_{Omega_t}
+        //     In residual form: (M_u + M_w - udr_term) + (Bxxd + Bxyd + Byyd) = 0
+        //     FIX: original code had  +udr_term;  the working state-only HM
+        //          reference has  -udr_term.
+        aResud[i]    += (M_u + Bxxd + Bxyd + Byyd + M_w - udr_term) * weight;
+
+        //  (6)-(8) adjoint sigma-Hessian relations (Hessian of ud)
+        aRessxxd[i]  += (Bxxud + M_sxxd) * weight;
+        aRessxyd[i]  += (Bxyud + M_sxyd) * weight;
+        aRessyyd[i]  += (Byyud + M_syyd) * weight;
+
+        // -------- CONTROL block (4 eqs) --------
+        //
+        // FIX: the original code had a cyclic mis-mapping among the four
+        // control residuals.  The correct row-to-equation mapping is:
+        //   aResw      <-->  optimality equation        (test = delta w)
+        //   aReswsxxd  <-->  sigma_w,xx Hessian relation (test = delta sigma_w,xx)
+        //   aReswsxyd  <-->  sigma_w,xy Hessian relation
+        //   aReswsyyd  <-->  sigma_w,yy Hessian relation
+        //
+        // The optimality (test = delta w) reads
+        //   alpha_0 (w, dw) + alpha_1 (grad w, grad dw)
+        //     + (grad dw, div lambda_sigma)
+        //     - alpha_2 (grad dw, div sigma_w)
+        //   = -(u + w - u_D, dw) + (g_opt, dw)
+        // In residual form:
+        //   M_u + M_w + alpha_0 M_w + alpha_1 (laplace-w-IBP)
+        //   + (Bxxd + Bxyd + Byyd)                                  <-- (grad dw, div lambda_sigma)
+        //   + alpha_2 (-Bwxxud - Bwxyud - Bwyyud)                    <-- -alpha_2 (grad dw, div sigma_w)
+        //   - udr_term - g_opt_val                                   <-- sources (RHS, carry minus)
+        //   = 0
+        //
+        // FIX: udr_term sign (had +, should be -).
+        // NEW: subtract g_opt_val (fictitious optimality source).
+        aResw[i]     += (M_u
+                         + Bxxd + Bxyd + Byyd
+                         + M_w_comb
+                         + alpha_2 * (- Bwxxud - Bwxyud - Bwyyud)
+                         - udr_term
+                         - g_opt_val) * weight;
+
+        // sigma_w-Hessian relations:
+        //   (sigma_w,alpha, tau) + (d_alpha w, d_alpha tau) = 0
+        // FIX: previously these three rows were cyclically shifted.
+        aReswsxxd[i] += (Bwxxu + M_wsxxd) * weight;
+        aReswsxyd[i] += (Bwxyu + M_wsxyd) * weight;    // M_wsxyd carries factor 2
+        aReswsyyd[i] += (Bwyyu + M_wsyyd) * weight;
       } // end phi_i loop
 
     } // end gauss point loop
@@ -1545,7 +1626,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
 }
 
   };
-  
+
 }
 
 #endif
