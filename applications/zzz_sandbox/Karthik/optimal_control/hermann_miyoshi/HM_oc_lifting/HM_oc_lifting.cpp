@@ -48,7 +48,7 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-      static constexpr double a = 0.001;
+     // static constexpr double a = 0.000001;
 
 // =========================================================================
 //  Manufactured solution for HM boundary control via lifting on [-0.5, 0.5]^2
@@ -742,43 +742,90 @@ private:
 //  are Dirichlet-pinned to their analytical traces on the entire boundary dOmega.
 
 
-/*
-// -----------------------------------------------------------------------
+//====Set boundary condition-BEGIN==============================
 bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
+  bool dirichlet = false; //dirichlet
 
-  //  -- primary scalars : Dirichlet to analytical trace --
-  if (!strcmp(SolName, "u")  ||
-// // //       !strcmp(SolName, "sxx") ||
-// // //       !strcmp(SolName, "sxy")||
-// // //       !strcmp(SolName, "syy") ||
-      !strcmp(SolName, "ud") ||
-// // //       !strcmp(SolName, "sxxd") ||
-// // //       !strcmp(SolName, "sxyd") ||
-// // //       !strcmp(SolName, "syyd") ||
-      !strcmp(SolName, "w")
-) {
-      Math::Function <double> * f = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      Value = f -> value(x);
-      return true;
+  if (!strcmp(SolName, "u")) {
+      Math::Function <double> * u = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+      // strcmp compares two string in lexiographic sense.
+    Value = u -> value(x);
+              dirichlet = true;
+
   }
+  else if (!strcmp(SolName, "sxx")) {
+      Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = sxx -> value(x);
+              dirichlet = true;
 
-  //  -- control sigma_w tensors : Dirichlet to analytical trace --
-  if (!strcmp(SolName, "wsxxd") ||
-      !strcmp(SolName, "wsxyd") ||
-      !strcmp(SolName, "wsyyd")) {
-      Math::Function <double> * f = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      Value = f -> value(x);
-      return true;
   }
+    else if (!strcmp(SolName, "sxy")) {
+      Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = sxy -> value(x);
+              dirichlet = true;
 
-  //  -- state and adjoint sigma tensors : free / natural --
-  Value = 0.;
-  return false;
+  }
+    else if (!strcmp(SolName, "syy")) {
+      Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = syy -> value(x);
+              dirichlet = true;
+
+  }
+  else if (!strcmp(SolName, "ud")) {
+      Math::Function <double> * ud = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+      // strcmp compares two string in lexiographic sense.
+    Value = ud -> value(x);
+              dirichlet = true;
+
+  }
+  else if (!strcmp(SolName, "sxxd")) {
+      Math::Function <double> * sxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = sxxd -> value(x);
+              dirichlet = true;
+
+  }
+    else if (!strcmp(SolName, "sxyd")) {
+      Math::Function <double> * sxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = sxyd -> value(x);
+              dirichlet = true;
+
+  }
+    else if (!strcmp(SolName, "syyd")) {
+      Math::Function <double> * syyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = syyd -> value(x);
+              dirichlet = true;
+
+  }
+    else if (!strcmp(SolName, "w")) {
+      Math::Function <double> * w = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = w -> value(x);
+              dirichlet = true;
+
+  }
+      else if (!strcmp(SolName, "wsxxd")) {
+      Math::Function <double> * wsxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = wsxxd -> value(x);
+              dirichlet = true;
+
+  }
+      else if (!strcmp(SolName, "wsxyd")) {
+      Math::Function <double> * wsxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = wsxyd -> value(x);
+              dirichlet = true;
+
+  }
+      else if (!strcmp(SolName, "wsyyd")) {
+      Math::Function <double> * wsyyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
+    Value = wsyyd -> value(x);
+              dirichlet = true;
+
+  }
+  return dirichlet;
 }
 //====Set boundary condition-END==============================
-*/
 
 
+/*
 bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
     const MultiLevelProblem * ml_prob,
     const std::vector<double>& x,
@@ -803,13 +850,52 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
 
   // ---------- primal state ----------
   if (!strcmp(SolName, "u")) {
-      Value = 0.;
+      Math::Function<double>* f =
+          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+
+      Value = f->value(x);
+
+//       Value = 0.;
+      return true;
+  }
+
+    if (!strcmp(SolName, "sxx")) {
+      Math::Function<double>* f =
+          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+
+      Value = f->value(x);
+
+//       Value = 0.;
+      return true;
+  }
+
+    if (!strcmp(SolName, "sxy")) {
+      Math::Function<double>* f =
+          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+
+      Value = f->value(x);
+
+//       Value = 0.;
+      return true;
+  }
+
+    if (!strcmp(SolName, "syy")) {
+      Math::Function<double>* f =
+          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+
+      Value = f->value(x);
+
+//       Value = 0.;
       return true;
   }
 
   // ---------- adjoint ----------
   if (!strcmp(SolName, "ud")) {
-      Value = 0.;
+//       Value = 0.;
+Math::Function<double>* f =
+          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+
+      Value = f->value(x);
       return true;
   }
 
@@ -864,7 +950,7 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
 
   Value = 0.;
   return false;
-}
+}*/
 
 
 

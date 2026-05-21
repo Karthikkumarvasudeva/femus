@@ -1095,7 +1095,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
     short unsigned ielGeom = msh->GetElementType(iel);
 
 // // //     unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
-    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_u);    // number of solution element dofs
+    unsigned nDofs  = msh->GetElementDofNumber(iel, solFEType_sxy);    // number of solution element dofs
 
 
 
@@ -1141,7 +1141,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
     for (unsigned i = 0; i < nDofs; i++) {
 
 // // //       unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_u);    // global to global mapping between solution node and solution dof
-      unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_sxx);    // global to global mapping between solution node and solution dof
+      unsigned solDof = msh->GetSolutionDof(i, iel, solFEType_u);    // global to global mapping between solution node and solution dof
 
 
 
@@ -1178,7 +1178,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
     }
 
     // local storage of coordinates
-    for (unsigned i = 0; i < nDofs2; i++) {
+    for (unsigned i = 0; i < nDofs; i++) {
       unsigned xDof  = msh->GetSolutionDof(i, iel, xType); // global to global mapping between coordinates node and coordinate dof
 
       for (unsigned jdim = 0; jdim < dim; jdim++) {
