@@ -1422,6 +1422,8 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
         //
         //   f_u_val = -[Delta^2 u + Delta^2 w]
         adept::adouble f_u_val = 0.0;
+
+        /*
         {
             const double xg = xGauss[0];
             const double yg = xGauss[1];
@@ -1439,7 +1441,49 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
             const double lap2_w = -96. * q_y + 2. * gpp_x * qpp_y + 24. * g_x;
 
             f_u_val = -(lap2_u + lap2_w);
+        }*/
+
+
+
+
+
+        {
+            const double xg = xGauss[0];
+            const double yg = xGauss[1];
+
+            // q polynomial and derivatives
+            const double q_x   = (0.25 - xg*xg) * (0.25 - xg*xg);
+            const double q_y   = (0.25 - yg*yg) * (0.25 - yg*yg);
+            const double qpp_x = -1. + 12.*xg*xg;
+            const double qpp_y = -1. + 12.*yg*yg;
+            const double qpppp_x = -12. + 144.*xg*xg;
+            const double qpppp_y = -12. + 144.*yg*yg;
+
+            // g polynomial and derivatives
+            const double g_x   = -4.*xg*xg*xg*xg - 4.*xg*xg*xg + 2.*xg*xg + 3.*xg + 0.75;
+            const double gpp_x = -48.*xg*xg - 24.*xg + 4.;
+
+            // g'''' (fourth derivative) - compute from g''
+            // g(x) = -4x^4 - 4x^3 + 2x^2 + 3x + 3/4
+            // g'(x) = -16x^3 - 12x^2 + 4x + 3
+            // g''(x) = -48x^2 - 24x + 4
+            // g'''(x) = -96x - 24
+            // g''''(x) = -96
+            const double gpppp_x = -96.;
+
+            // Δ²u = q''''(x) q(y) + 2 q''(x) q''(y) + q(x) q''''(y)
+            const double lap2_u = qpppp_x * q_y + 2. * qpp_x * qpp_y + q_x * qpppp_y;
+
+            // Δ²w = g''''(x) q(y) + 2 g''(x) q''(y) + g(x) q''''(y)
+            const double lap2_w = gpppp_x * q_y + 2. * gpp_x * qpp_y + g_x * qpppp_y;
+
+            f_u_val = -(lap2_u + lap2_w);
         }
+
+
+
+
+
 
 
         // ----- g_opt_val: fictitious source on the optimality equation -----
