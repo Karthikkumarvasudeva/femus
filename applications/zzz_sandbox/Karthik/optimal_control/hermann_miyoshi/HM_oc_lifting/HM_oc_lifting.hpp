@@ -36,9 +36,9 @@
 
 using namespace femus;
 
-static constexpr double alpha_0 = 0.000001 ;
-static constexpr double alpha_1 = 0.000001;
-static constexpr double alpha_2 = 0.000001;
+static constexpr double alpha_0 = 0.00000001 ;
+static constexpr double alpha_1 = 0.00000001;
+static constexpr double alpha_2 = 0.00000001;
 
 
 
@@ -1439,7 +1439,14 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
                             (cos2x * c_y2 + c_x2 * cos2y + cos2x * cos2y);
             const double lap2_w = -96. * q_y + 2. * gpp_x * qpp_y + 24. * g_x;
 
-            f_u_val = -(lap2_u + lap2_w);
+// // //             f_u_val = -(lap2_u + lap2_w);
+
+                        const double xg2 = xg*xg, xg3 = xg2*xg, xg4 = xg2*xg2;
+const double yg2 = yg*yg, yg4 = yg2*yg2;
+
+f_u_val = -72.*xg4 - 96.*xg3 - 864.*xg2*yg2 + 108.*xg2 - 576.*xg*yg2 + 120.*xg - 72.*yg4 + 108.*yg2 + 9.;
+
+
         }
 
 
@@ -1480,7 +1487,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
         // -------- STATE block (4 eqs) --------
         //  (1) state PDE row (test = delta lambda_u, residual aResu)
         //         (grad phi, div(sigma + sigma_w)) = -(f, phi)
-        aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud - f_u_val) * weight;
+        aResu[i]     += (Bxx + Bxy + Byy + Bwxxud + Bwxyud + Bwyyud + f_u_val) * weight;
 
         //  (2)-(4) state sigma-Hessian relations
         //         (sigma_alpha, tau) + (d_alpha u, d_alpha tau) = 0

@@ -96,6 +96,8 @@ namespace  square_m05p05  {
 //     The key: this family is KNOWN to work (ud converges cleanly), and has
 //     O(1) magnitude (unlike the polynomial q which has max ~ 0.004).
 // -----------------------------------------------------------------------
+
+/*
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
 
@@ -245,6 +247,200 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
+*/
+
+
+
+
+
+
+
+template <class type = double>
+class Function_Zero_on_boundary_7 : public Math::Function<type> {
+public:
+
+    static type q    (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
+
+    static type qp   (const type s) { return -s + 4.*s*s*s; }
+
+    static type qpp  (const type s) { return -1. + 12.*s*s; }
+
+    static type qppp (const type s) { return -12.*s + 48.*s*s*s; }
+
+    static type qpppp(const type s) { return -12. + 144.*s*s; }
+
+    type value(const std::vector<type>& x) const {
+        return q(x[0]) * q(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = qp(x[0]) * q (x[1]);
+        solGrad[1] = q (x[0]) * qp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return qpp(x[0]) * q(x[1])
+             + q(x[0]) * qpp(x[1]);
+    }
+};
+
+
+//  -- Delta u  =  cpp(x) c(y) + c(x) cpp(y) ------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_Laplacian : public Math::Function<type> {
+
+public:
+    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
+    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
+    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
+
+    type value(const std::vector<type>& x) const {
+        return cpp(x[0]) * c(x[1]) + c(x[0]) * cpp(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
+        const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
+        solGrad[0] = cppp_x * c (x[1]) + cp (x[0]) * cpp(x[1]);
+        solGrad[1] = cpp(x[0]) * cp(x[1]) + c  (x[0]) * cppp_y;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        // Delta(Delta u) = cpppp c + 2 cpp cpp + c cpppp
+        const type cpppp_x = 8.*pi*pi*pi*pi * cos(2.*pi*x[0]);
+        const type cpppp_y = 8.*pi*pi*pi*pi * cos(2.*pi*x[1]);
+        return cpppp_x * c(x[1]) + 2. * cpp(x[0]) * cpp(x[1]) + c(x[0]) * cpppp_y;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+
+//  -- sigma_xx  =  u_xx  =  cpp(x) c(y) ----------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_sxx : public Math::Function<type> {
+
+public:
+
+    static type c   (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
+
+    static type cp  (const type s) { return -s + 4.*s*s*s; }
+
+    static type cpp (const type s) { return -1. + 12.*s*s; }
+
+    static type cppp(const type s) { return 24.*s; }
+
+    static type cpppp(const type)  { return 24.; }
+
+    type value(const std::vector<type>& x) const {
+
+        return cpp(x[0]) * c(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = cppp(x[0]) * c (x[1]);
+        solGrad[1] = cpp (x[0]) * cp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return cpppp(x[0]) * c(x[1])
+             + cpp(x[0]) * cpp(x[1]);
+    }
+};
+
+//  -- sigma_xy  =  u_xy  =  cp(x) cp(y) ----------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_sxy : public Math::Function<type> {
+
+public:
+
+    static type cp  (const type s) { return -s + 4.*s*s*s; }
+
+    static type cpp (const type s) { return -1. + 12.*s*s; }
+
+    static type cppp(const type s) { return 24.*s; }
+
+    type value(const std::vector<type>& x) const {
+
+        return cp(x[0]) * cp(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = cpp(x[0]) * cp (x[1]);
+        solGrad[1] = cp (x[0]) * cpp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return cppp(x[0]) * cp(x[1])
+             + cp(x[0])   * cppp(x[1]);
+    }
+};
+
+//  -- sigma_yy  =  u_yy  =  c(x) cpp(y) ----------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_syy : public Math::Function<type> {
+
+public:
+
+    static type c   (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
+
+    static type cp  (const type s) { return -s + 4.*s*s*s; }
+
+    static type cpp (const type s) { return -1. + 12.*s*s; }
+
+    static type cppp(const type s) { return 24.*s; }
+
+    static type cpppp(const type)  { return 24.; }
+
+    type value(const std::vector<type>& x) const {
+
+        return c(x[0]) * cpp(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = cp(x[0]) * cpp (x[1]);
+        solGrad[1] = c (x[0]) * cppp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return cpp(x[0]) * cpp(x[1])
+             + c(x[0]) * cpppp(x[1]);
+    }
+};
+
+
+
+
+
+
+
 
 //  -- w (lifting / boundary control)
 //     w(x,y) = g(x) q(y) ,   g(x) = (x+1/2)^2 (3 - 4 x^2)
@@ -399,6 +595,8 @@ private:
 //     (cos(pi/2)=0 takes care of value;  d/ds cos^2 = -pi sin(2 pi s)
 //      vanishes at s = +/- 1/2).
 // -----------------------------------------------------------------------
+
+
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_u_d : public Math::Function<type> {
 
@@ -520,6 +718,199 @@ private:
 };
 
 
+
+
+
+/*
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_u_d : public Math::Function<type> {
+public:
+
+    static type q    (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
+
+    static type qp   (const type s) { return -s + 4.*s*s*s; }
+
+    static type qpp  (const type s) { return -1. + 12.*s*s; }
+
+    static type qppp (const type s) { return -12.*s + 48.*s*s*s; }
+
+    static type qpppp(const type s) { return -12. + 144.*s*s; }
+
+    type value(const std::vector<type>& x) const {
+        return q(x[0]) * q(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = qp(x[0]) * q (x[1]);
+        solGrad[1] = q (x[0]) * qp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return qpp(x[0]) * q(x[1])
+             + q(x[0]) * qpp(x[1]);
+    }
+};
+
+
+//  -- Delta u  =  cpp(x) c(y) + c(x) cpp(y) ------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_Laplacian_ud : public Math::Function<type> {
+
+public:
+    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
+    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
+    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
+
+    type value(const std::vector<type>& x) const {
+        return cpp(x[0]) * c(x[1]) + c(x[0]) * cpp(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> solGrad(x.size(), 0.);
+        const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
+        const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
+        solGrad[0] = cppp_x * c (x[1]) + cp (x[0]) * cpp(x[1]);
+        solGrad[1] = cpp(x[0]) * cp(x[1]) + c  (x[0]) * cppp_y;
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+        // Delta(Delta u) = cpppp c + 2 cpp cpp + c cpppp
+        const type cpppp_x = 8.*pi*pi*pi*pi * cos(2.*pi*x[0]);
+        const type cpppp_y = 8.*pi*pi*pi*pi * cos(2.*pi*x[1]);
+        return cpppp_x * c(x[1]) + 2. * cpp(x[0]) * cpp(x[1]) + c(x[0]) * cpppp_y;
+    }
+
+private:
+    static constexpr double pi = acos(-1.);
+};
+
+
+//  -- sigma_xx  =  u_xx  =  cpp(x) c(y) ----------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_sxxd : public Math::Function<type> {
+
+public:
+
+    static type c   (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
+
+    static type cp  (const type s) { return -s + 4.*s*s*s; }
+
+    static type cpp (const type s) { return -1. + 12.*s*s; }
+
+    static type cppp(const type s) { return 24.*s; }
+
+    static type cpppp(const type)  { return 24.; }
+
+    type value(const std::vector<type>& x) const {
+
+        return cpp(x[0]) * c(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = cppp(x[0]) * c (x[1]);
+        solGrad[1] = cpp (x[0]) * cp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return cpppp(x[0]) * c(x[1])
+             + cpp(x[0]) * cpp(x[1]);
+    }
+};
+
+//  -- sigma_xy  =  u_xy  =  cp(x) cp(y) ----------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_sxyd : public Math::Function<type> {
+
+public:
+
+    static type cp  (const type s) { return -s + 4.*s*s*s; }
+
+    static type cpp (const type s) { return -1. + 12.*s*s; }
+
+    static type cppp(const type s) { return 24.*s; }
+
+    type value(const std::vector<type>& x) const {
+
+        return cp(x[0]) * cp(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = cpp(x[0]) * cp (x[1]);
+        solGrad[1] = cp (x[0]) * cpp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return cppp(x[0]) * cp(x[1])
+             + cp(x[0])   * cppp(x[1]);
+    }
+};
+
+//  -- sigma_yy  =  u_yy  =  c(x) cpp(y) ----------------------------------
+template <class type = double>
+class Function_Zero_on_boundary_7_deviatoric_syyd : public Math::Function<type> {
+
+public:
+
+    static type c   (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
+
+    static type cp  (const type s) { return -s + 4.*s*s*s; }
+
+    static type cpp (const type s) { return -1. + 12.*s*s; }
+
+    static type cppp(const type s) { return 24.*s; }
+
+    static type cpppp(const type)  { return 24.; }
+
+    type value(const std::vector<type>& x) const {
+
+        return c(x[0]) * cpp(x[1]);
+    }
+
+    std::vector<type> gradient(const std::vector<type>& x) const {
+
+        std::vector<type> solGrad(x.size(), 0.);
+
+        solGrad[0] = cp(x[0]) * cpp (x[1]);
+        solGrad[1] = c (x[0]) * cppp(x[1]);
+
+        return solGrad;
+    }
+
+    type laplacian(const std::vector<type>& x) const {
+
+        return cpp(x[0]) * cpp(x[1])
+             + c(x[0]) * cpppp(x[1]);
+    }
+};
+
+*/
+
+
+
+
+
+
+
+
 //  -- u_dr  =  TARGET u_D  for the optimal-control problem
 //
 //     For the manufactured-solution KKT to be satisfied exactly,
@@ -531,14 +922,11 @@ private:
 //
 //     Hence  u_D = c(x) c(y) + g(x) q(y) - Delta^2[c(x) c(y)].
 // -----------------------------------------------------------------------
-/*
+
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> {
 
 public:
-    static type Q   (const type s) { const type a = 1. - 4.*s*s; return a*a; }
-    static type Qp  (const type s) { return -16.*s + 64.*s*s*s; }
-    static type Qpp (const type s) { return -16. + 192.*s*s; }
     static type q   (const type s) { const type a = 0.25 - s*s; return a*a; }
     static type qp  (const type s) { return -s + 4.*s*s*s; }
     static type qpp (const type s) { return -1. + 12.*s*s; }
@@ -546,7 +934,9 @@ public:
         return -4.*s*s*s*s - 4.*s*s*s + 2.*s*s + 3.*s + 0.75;
     }
     static type gp  (const type s) { return -16.*s*s*s - 12.*s*s + 4.*s + 3.; }
+    static type gpp  (const type s) { return -48.*s*s - 24.*s + 4.; }
     static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
+    static type cp (const type s) { return -pi * sin(2. * pi * s); }
     static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
 
     static type lap2_ud(const type sx, const type sy) {
@@ -559,68 +949,74 @@ public:
 
     type value(const std::vector<type>& x) const {
         //    u_D = Q(x) Q(y) + g(x) Q(y) - Delta^2[c(x) c(y)]
-        return (Q(x[0]) + g(x[0])) * Q(x[1]) - lap2_ud(x[0], x[1]);
+        return (q(x[0]) + g(x[0])) * q(x[1]) - lap2_ud(x[0], x[1]);
     }
 
+       // -- gradient
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        const type cp_x   = -pi * sin(2.*pi*x[0]);
-        const type cp_y   = -pi * sin(2.*pi*x[1]);
-        const type dlap2_dx = 8.*pi*pi*pi*pi *
-            ( -2.*pi * sin(2.*pi*x[0]) * c(x[1])
-            +  cp_x  * cos(2.*pi*x[1])
-            + -2.*pi * sin(2.*pi*x[0]) * cos(2.*pi*x[1]) );
-        (void) cp_x;
-        const type dlap2_dy = 8.*pi*pi*pi*pi *
-            ( cos(2.*pi*x[0]) * cp_y
-            + c(x[0]) * (-2.*pi*sin(2.*pi*x[1]))
-            + cos(2.*pi*x[0]) * (-2.*pi*sin(2.*pi*x[1])) );
-        (void) cp_y;
-        // d/dx [(Q(x) + g(x)) Q(y)] = (Qp(x) + gp(x)) Q(y)
-        solGrad[0] = (Qp(x[0]) + gp(x[0])) * Q (x[1]) - dlap2_dx;
-        solGrad[1] = (Q (x[0]) + g (x[0])) * Qp(x[1]) - dlap2_dy;
+
+        // d/dx (u+w) = (qp(x) + gp(x)) q(y)
+        // d/dy (u+w) = (q(x)  + g(x))  qp(y)
+        const type d_uw_dx = (qp(x[0]) + gp(x[0])) * q (x[1]);
+        const type d_uw_dy = (q (x[0]) + g (x[0])) * qp(x[1]);
+
+        // d/dx (lap2_ud):
+        //   = 8 pi^4 [ -2 pi sin(2pi x) c(y) + cp(x) cos(2pi y)
+        //              + -2 pi sin(2pi x) cos(2pi y) ]
+        const type m2pi_sin2x = -2.*pi * sin(2.*pi*x[0]);
+        const type m2pi_sin2y = -2.*pi * sin(2.*pi*x[1]);
+
+        const type d_lap2_dx = 8.*pi*pi*pi*pi *
+            ( m2pi_sin2x * c(x[1])
+            + cp(x[0])   * cos(2.*pi*x[1])
+            + m2pi_sin2x * cos(2.*pi*x[1]) );
+        const type d_lap2_dy = 8.*pi*pi*pi*pi *
+            ( cos(2.*pi*x[0]) * cp(x[1])
+            + c(x[0])         * m2pi_sin2y
+            + cos(2.*pi*x[0]) * m2pi_sin2y );
+
+        solGrad[0] = d_uw_dx - d_lap2_dx;
+        solGrad[1] = d_uw_dy - d_lap2_dy;
         return solGrad;
     }
 
+    // -- laplacian:  Delta(u_D) = Delta(u+w) - Delta(Delta^2 ud)
     type laplacian(const std::vector<type>& x) const {
-        // Delta(u_D) = Delta[c(x) c(y) + g(x) q(y)] - Delta[Delta^2 ud]
-        const type lap_u = cpp(x[0]) * c(x[1]) + c(x[0]) * cpp(x[1]);
-        const type qpp_y = -1. + 12.*x[1]*x[1];
-        const type gpp_x = -48.*x[0]*x[0] - 24.*x[0] + 4.;
-        const type lap_w = gpp_x * q(x[1]) + g(x[0]) * qpp_y;
+        // Delta(u+w) = (qpp(x) + gpp(x)) q(y) + (q(x) + g(x)) qpp(y)
+        const type lap_uw = (qpp(x[0]) + gpp(x[0])) * q (x[1])
+                          + (q (x[0]) + g (x[0])) * qpp(x[1]);
 
+        // Delta(lap2_ud):
+        // Let A = cos(2pi x) c(y),    B = c(x) cos(2pi y),    C = cos(2pi x) cos(2pi y)
+        // Delta A = -4 pi^2 cos(2pi x) c(y) + cos(2pi x) cpp(y)
+        // Delta B = cpp(x) cos(2pi y) - 4 pi^2 c(x) cos(2pi y)
+        // Delta C = -4 pi^2 cos(2pi x) cos(2pi y) - 4 pi^2 cos(2pi x) cos(2pi y)
         const type cos2x   = cos(2.*pi*x[0]);
         const type cos2y   = cos(2.*pi*x[1]);
-        const type cos2x_pp = -4.*pi*pi * cos2x;
-        const type cos2y_pp = -4.*pi*pi * cos2y;
-        const type cpp_y    = -2.*pi*pi * cos2y;
-        const type cpp_x    = -2.*pi*pi * cos2x;
+        const type four_pi2 = 4.*pi*pi;
 
-        const type lap_part_1 = cos2x_pp * c(x[1]) + cos2x * cpp_y;
-        const type lap_part_2 = cpp_x   * cos2y    + c(x[0]) * cos2y_pp;
-        const type lap_part_3 = cos2x_pp * cos2y   + cos2x * cos2y_pp;
+        const type lapA = -four_pi2 * cos2x * c(x[1]) + cos2x * cpp(x[1]);
+        const type lapB =  cpp(x[0]) * cos2y - four_pi2 * c(x[0]) * cos2y;
+        const type lapC = -four_pi2 * cos2x * cos2y - four_pi2 * cos2x * cos2y;
 
-        const type lap_lap2_ud = 8.*pi*pi*pi*pi * (lap_part_1 + lap_part_2 + lap_part_3);
+        const type lap_lap2_ud = 8.*pi*pi*pi*pi * (lapA + lapB + lapC);
 
-        return lap_u + lap_w - lap_lap2_ud;
+        return lap_uw - lap_lap2_ud;
     }
 
 private:
     static constexpr double pi = acos(-1.);
-    static type cp(const type s) { return -pi * sin(2.*pi*s); }
 };
-*/
 
+
+/*
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> {
 public:
     // ====================================================================
-    // YOUR PROVIDED u_D RHS (POLYNOMIAL ONLY)
+    // u_D = u + w - Δ²(ud)  with  u = ud = q(x)q(y),  w = g(x)q(y)
     // ====================================================================
-    // u_D(x,y) = x⁴y⁴ + (7/2)x⁴y² + (369/16)x⁴
-    //            + 4x³y² - x³
-    //            - (1/2)x²y⁴ + (1145/4)x²y²
-
     type value(const std::vector<type>& x) const {
         const type x2 = x[0]*x[0];
         const type x3 = x2*x[0];
@@ -628,13 +1024,25 @@ public:
         const type y2 = x[1]*x[1];
         const type y4 = y2*y2;
 
-        return  (x4*y4 + (7./2.)*x4*y2 + (369./16.)*x4
-             + 4.*x3*y2 - x3
-             - (1./2.)*x2*y4 + (1145./4.)*x2*y2) - 1137./32 * x2 - 3. * x[0] * y2 + 3./4. * x[0] + 385./16. * y4 - 117./32. * y2 + 1329./256.;
+        return -3.*x4*y4 + (3./2.)*x4*y2 - (387./16.)*x4
+             - 4.*x3*y4 + 2.*x3*y2 - (1./4.)*x3
+             + (3./2.)*x2*y4 - (1155./4.)*x2*y2 + (1155./32.)*x2
+             + 3.*x[0]*y4 - (3./2.)*x[0]*y2 + (3./16.)*x[0]
+             - (371./16.)*y4 + (1139./32.)*y2 - 1267./256.;
     }
 
     // ====================================================================
-    // GRADIENT: ∂u_D/∂x and ∂u_D/∂y
+    // GRADIENT
+    // ∂u_D/∂x = -12 x³y⁴ + 6 x³y² - (387/4) x³
+    //           -12 x²y⁴ + 6 x²y² - (3/4) x²
+    //           + 3 x y⁴ - (1155/2) x y² + (1155/16) x
+    //           + 3 y⁴ - (3/2) y² + 3/16
+    //
+    // ∂u_D/∂y = -12 x⁴y³ + 3 x⁴y
+    //           -16 x³y³ + 4 x³y
+    //           + 6 x²y³ - (1155/2) x²y
+    //           + 12 x y³ - 3 x y
+    //           - (371/4) y³ + (1139/16) y
     // ====================================================================
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> grad(2, 0.);
@@ -646,45 +1054,47 @@ public:
         const type y3 = y2*x[1];
         const type y4 = y2*y2;
 
-        // ∂u_D/∂x = 4x³y⁴ + 14x³y² + (369/4)x³ + 12x²y² - 3x²
-        //           - xy⁴ + (1145/2)xy²
-        grad[0] = 4.*x3*y4 + 14.*x3*y2 + (369./4.)*x3
-                + 12.*x2*y2 - 3.*x2
-                - x[0]*y4 + (1145./2.)*x[0]*y2;
+        grad[0] = -12.*x3*y4 + 6.*x3*y2 - (387./4.)*x3
+                - 12.*x2*y4 + 6.*x2*y2 - (3./4.)*x2
+                + 3.*x[0]*y4 - (1155./2.)*x[0]*y2 + (1155./16.)*x[0]
+                + 3.*y4 - (3./2.)*y2 + (3./16.);
 
-        // ∂u_D/∂y = 4x⁴y³ + 7x⁴y + 8x³y - 2x²y³ + (1145/2)x²y
-        grad[1] = 4.*x4*y3 + 7.*x4*x[1] + 8.*x3*x[1]
-                - 2.*x2*y3 + (1145./2.)*x2*x[1];
+        grad[1] = -12.*x4*y3 + 3.*x4*x[1]
+                - 16.*x3*y3 + 4.*x3*x[1]
+                + 6.*x2*y3 - (1155./2.)*x2*x[1]
+                + 12.*x[0]*y3 - 3.*x[0]*x[1]
+                - (371./4.)*y3 + (1139./16.)*x[1];
 
         return grad;
     }
 
     // ====================================================================
-    // LAPLACIAN: Δu_D = ∂²u_D/∂x² + ∂²u_D/∂y²
+    // LAPLACIAN
+    // Δu_D = -36 x⁴y² + 3 x⁴
+    //        -48 x³y² + 4 x³
+    //        -36 x²y⁴ + 36 x²y² - (3471/4) x²
+    //        -24 x y⁴ + 48 x y² - (9/2) x
+    //        + 3 y⁴ - (3423/4) y² + 1147/8
     // ====================================================================
     type laplacian(const std::vector<type>& x) const {
         const type x2 = x[0]*x[0];
-        const type x3 = x[0]*x2;
+        const type x3 = x2*x[0];
         const type x4 = x2*x2;
         const type y2 = x[1]*x[1];
         const type y4 = y2*y2;
 
-        // ∂²u_D/∂x² = 12x²y⁴ + 42x²y² + (1107/4)x² + 24xy² - 6x
-        //             - y⁴ + (1145/2)y²
-        const type d2u_dx2 = 12.*x2*y4 + 42.*x2*y2 + (1107./4.)*x2
-                           + 24.*x[0]*y2 - 6.*x[0]
-                           - y4 + (1145./2.)*y2;
-
-        // ∂²u_D/∂y² = 12x⁴y² + 7x⁴ + 8x³ - 6x²y² + (1145/2)x²
-        const type d2u_dy2 = 12.*x4*y2 + 7.*x4 + 8.*x3
-                           - 6.*x2*y2 + (1145./2.)*x2;
-
-        return d2u_dx2 + d2u_dy2;
+        return -36.*x4*y2 + 3.*x4
+             - 48.*x3*y2 + 4.*x3
+             - 36.*x2*y4 + 36.*x2*y2 - (3471./4.)*x2
+             - 24.*x[0]*y4 + 48.*x[0]*y2 - (9./2.)*x[0]
+             + 3.*y4 - (3423./4.)*y2 + (1147./8.);
     }
 
 private:
     static constexpr double pi = 3.14159265358979323846;
 };
+*/
+
 
 
 //  -- f (state-PDE source)  =  -Delta^2 ( u + w )
@@ -697,37 +1107,6 @@ private:
 //
 //     f = - [Delta^2 u + Delta^2 w]
 // -----------------------------------------------------------------------
-template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_f : public Math::Function<type> {
-
-public:
-    static type q   (const type s) { const type a = 0.25 - s*s; return a*a; }
-    static type qpp (const type s) { return -1. + 12.*s*s; }
-    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
-    static type g   (const type s) {
-        return -4.*s*s*s*s - 4.*s*s*s + 2.*s*s + 3.*s + 0.75;
-    }
-    static type gpp (const type s) { return -48.*s*s - 24.*s + 4.; }
-
-    type value(const std::vector<type>& x) const {
-        const type lap2_u = 8.*pi*pi*pi*pi *
-                (cos(2.*pi*x[0]) * c(x[1])
-               + c(x[0]) * cos(2.*pi*x[1])
-               + cos(2.*pi*x[0]) * cos(2.*pi*x[1]));
-        const type lap2_w = -96. * q(x[1])
-                          + 2. * gpp(x[0]) * qpp(x[1])
-                          + 24. * g(x[0]);
-        return (lap2_u + lap2_w);   // flipped sign
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        return std::vector<type>(x.size(), 0.);
-    }
-    type laplacian(const std::vector<type>& x) const { return 0.; }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
 
 
 //  -- g_opt (optimality-equation source) -------------------------------------
@@ -1097,7 +1476,6 @@ int main(int argc, char** args) {
 
   // NEW: f  =  Delta^2(u+w)         -- state PDE source
   //      g  =  alpha_0 w - alpha_1 Delta w - alpha_2 Delta^2 w   -- optimality source
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_f    <>   system_biharmonic_HM_function_zero_on_boundary_f;
   Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_gopt <>   system_biharmonic_HM_function_zero_on_boundary_gopt;
 
   // // Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_f<> Function_Zero_on_boundary_7_deviatoric_f;
