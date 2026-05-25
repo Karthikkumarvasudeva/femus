@@ -1426,27 +1426,10 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
         {
             const double xg = xGauss[0];
             const double yg = xGauss[1];
-            const double c_x   = cos(pi * xg); const double c_x2 = c_x * c_x;
-            const double c_y   = cos(pi * yg); const double c_y2 = c_y * c_y;
-            const double cos2x = cos(2. * pi * xg);
-            const double cos2y = cos(2. * pi * yg);
-            const double q_y   = (0.25 - yg*yg) * (0.25 - yg*yg);
-            const double qpp_y = -1. + 12.*yg*yg;
-            const double g_x   = -4.*xg*xg*xg*xg - 4.*xg*xg*xg + 2.*xg*xg + 3.*xg + 0.75;
-            const double gpp_x = -48.*xg*xg - 24.*xg + 4.;
+            const double xg2 = xg*xg, xg3 = xg2*xg, xg4 = xg2*xg2;
+            const double yg2 = yg*yg, yg4 = yg2*yg2;
 
-            const double lap2_u = 8. * pi * pi * pi * pi *
-                            (cos2x * c_y2 + c_x2 * cos2y + cos2x * cos2y);
-            const double lap2_w = -96. * q_y + 2. * gpp_x * qpp_y + 24. * g_x;
-
-// // //             f_u_val = -(lap2_u + lap2_w);
-
-                        const double xg2 = xg*xg, xg3 = xg2*xg, xg4 = xg2*xg2;
-const double yg2 = yg*yg, yg4 = yg2*yg2;
-
-f_u_val = (-72.*xg4 - 96.*xg3 - 864.*xg2*yg2 + 108.*xg2 - 576.*xg*yg2 + 120.*xg - 72.*yg4 + 108.*yg2 + 9.) * phi[i] ;
-
-
+            f_u_val = (-72.*xg4 - 96.*xg3 - 864.*xg2*yg2 + 108.*xg2 - 576.*xg*yg2 + 120.*xg - 72.*yg4 + 108.*yg2 + 9.) * phi[i] ;
         }
 
 
@@ -1529,7 +1512,6 @@ f_u_val = (-72.*xg4 - 96.*xg3 - 864.*xg2*yg2 + 108.*xg2 - 576.*xg*yg2 + 120.*xg 
         //   - udr_term - g_opt_val                                   <-- sources (RHS, carry minus)
         //   = 0
         //
-        // FIX: udr_term sign (had +, should be -).
         // NEW: subtract g_opt_val (fictitious optimality source).
         aResw[i]     += (M_u
                          + Bxxd + Bxyd + Byyd

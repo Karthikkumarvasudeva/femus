@@ -250,11 +250,6 @@ private:
 */
 
 
-
-
-
-
-
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
 public:
@@ -436,12 +431,6 @@ public:
 };
 
 
-
-
-
-
-
-
 //  -- w (lifting / boundary control)
 //     w(x,y) = g(x) q(y) ,   g(x) = (x+1/2)^2 (3 - 4 x^2)
 //
@@ -588,15 +577,6 @@ private:
 };
 
 
-
-//  -- ud (adjoint displacement)  =  c(x) c(y) ,   c(s) = cos^2(pi s)
-//
-//     ud is clamped: ud = 0 AND grad ud . n = 0 on dOmega
-//     (cos(pi/2)=0 takes care of value;  d/ds cos^2 = -pi sin(2 pi s)
-//      vanishes at s = +/- 1/2).
-// -----------------------------------------------------------------------
-
-
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_u_d : public Math::Function<type> {
 
@@ -716,9 +696,6 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
-
-
-
 
 
 /*
@@ -905,12 +882,6 @@ public:
 */
 
 
-
-
-
-
-
-
 //  -- u_dr  =  TARGET u_D  for the optimal-control problem
 //
 //     For the manufactured-solution KKT to be satisfied exactly,
@@ -1008,92 +979,6 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
-
-
-/*
-template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> {
-public:
-    // ====================================================================
-    // u_D = u + w - Δ²(ud)  with  u = ud = q(x)q(y),  w = g(x)q(y)
-    // ====================================================================
-    type value(const std::vector<type>& x) const {
-        const type x2 = x[0]*x[0];
-        const type x3 = x2*x[0];
-        const type x4 = x2*x2;
-        const type y2 = x[1]*x[1];
-        const type y4 = y2*y2;
-
-        return -3.*x4*y4 + (3./2.)*x4*y2 - (387./16.)*x4
-             - 4.*x3*y4 + 2.*x3*y2 - (1./4.)*x3
-             + (3./2.)*x2*y4 - (1155./4.)*x2*y2 + (1155./32.)*x2
-             + 3.*x[0]*y4 - (3./2.)*x[0]*y2 + (3./16.)*x[0]
-             - (371./16.)*y4 + (1139./32.)*y2 - 1267./256.;
-    }
-
-    // ====================================================================
-    // GRADIENT
-    // ∂u_D/∂x = -12 x³y⁴ + 6 x³y² - (387/4) x³
-    //           -12 x²y⁴ + 6 x²y² - (3/4) x²
-    //           + 3 x y⁴ - (1155/2) x y² + (1155/16) x
-    //           + 3 y⁴ - (3/2) y² + 3/16
-    //
-    // ∂u_D/∂y = -12 x⁴y³ + 3 x⁴y
-    //           -16 x³y³ + 4 x³y
-    //           + 6 x²y³ - (1155/2) x²y
-    //           + 12 x y³ - 3 x y
-    //           - (371/4) y³ + (1139/16) y
-    // ====================================================================
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> grad(2, 0.);
-
-        const type x2 = x[0]*x[0];
-        const type x3 = x2*x[0];
-        const type x4 = x2*x2;
-        const type y2 = x[1]*x[1];
-        const type y3 = y2*x[1];
-        const type y4 = y2*y2;
-
-        grad[0] = -12.*x3*y4 + 6.*x3*y2 - (387./4.)*x3
-                - 12.*x2*y4 + 6.*x2*y2 - (3./4.)*x2
-                + 3.*x[0]*y4 - (1155./2.)*x[0]*y2 + (1155./16.)*x[0]
-                + 3.*y4 - (3./2.)*y2 + (3./16.);
-
-        grad[1] = -12.*x4*y3 + 3.*x4*x[1]
-                - 16.*x3*y3 + 4.*x3*x[1]
-                + 6.*x2*y3 - (1155./2.)*x2*x[1]
-                + 12.*x[0]*y3 - 3.*x[0]*x[1]
-                - (371./4.)*y3 + (1139./16.)*x[1];
-
-        return grad;
-    }
-
-    // ====================================================================
-    // LAPLACIAN
-    // Δu_D = -36 x⁴y² + 3 x⁴
-    //        -48 x³y² + 4 x³
-    //        -36 x²y⁴ + 36 x²y² - (3471/4) x²
-    //        -24 x y⁴ + 48 x y² - (9/2) x
-    //        + 3 y⁴ - (3423/4) y² + 1147/8
-    // ====================================================================
-    type laplacian(const std::vector<type>& x) const {
-        const type x2 = x[0]*x[0];
-        const type x3 = x2*x[0];
-        const type x4 = x2*x2;
-        const type y2 = x[1]*x[1];
-        const type y4 = y2*y2;
-
-        return -36.*x4*y2 + 3.*x4
-             - 48.*x3*y2 + 4.*x3
-             - 36.*x2*y4 + 36.*x2*y2 - (3471./4.)*x2
-             - 24.*x[0]*y4 + 48.*x[0]*y2 - (9./2.)*x[0]
-             + 3.*y4 - (3423./4.)*y2 + (1147./8.);
-    }
-
-private:
-    static constexpr double pi = 3.14159265358979323846;
-};
-*/
 
 
 

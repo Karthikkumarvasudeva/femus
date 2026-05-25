@@ -673,7 +673,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 6;
+    unsigned max_number_of_meshes = 4;
 
         if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
@@ -726,8 +726,8 @@ int main(int argc, char** args) {
     // ======= System Specifics for Stress-Based Problem - END ==================
 
     // Various choices for convergence study
-    std::vector < bool > convergence_rate_computation_method_Flag = {true, true};
-    std::vector < bool > volume_or_boundary_Flag = {true, true};
+    std::vector < bool > convergence_rate_computation_method_Flag = {true, false};
+    std::vector < bool > volume_or_boundary_Flag = {true, false};
     std::vector < bool > sobolev_norms_Flag = {true, true};
 
     // ======= Perform Convergence Study ========================
