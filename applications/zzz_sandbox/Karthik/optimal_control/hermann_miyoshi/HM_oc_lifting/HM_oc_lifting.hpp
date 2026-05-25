@@ -1444,7 +1444,7 @@ static void AssembleBilaplaceProblem_AD(MultiLevelProblem& ml_prob) {
                         const double xg2 = xg*xg, xg3 = xg2*xg, xg4 = xg2*xg2;
 const double yg2 = yg*yg, yg4 = yg2*yg2;
 
-f_u_val = -72.*xg4 - 96.*xg3 - 864.*xg2*yg2 + 108.*xg2 - 576.*xg*yg2 + 120.*xg - 72.*yg4 + 108.*yg2 + 9.;
+f_u_val = (-72.*xg4 - 96.*xg3 - 864.*xg2*yg2 + 108.*xg2 - 576.*xg*yg2 + 120.*xg - 72.*yg4 + 108.*yg2 + 9.) * phi[i] ;
 
 
         }
