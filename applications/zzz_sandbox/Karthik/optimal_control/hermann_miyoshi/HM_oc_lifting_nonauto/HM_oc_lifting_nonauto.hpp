@@ -1589,14 +1589,14 @@ for (unsigned i = 0; i < nDofs_w; ++i) {
     real_num_mov m_a2_div_sigmaw = 0.0;
     if (dim == 2) {
         for (unsigned j = 0; j < nDofs_wsxxd; ++j) {
-            m_a2_div_sigmaw += - alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[9].elem_dofs()[j];
+            m_a2_div_sigmaw +=  alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxxd[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[9].elem_dofs()[j];
         }
         for (unsigned j = 0; j < nDofs_wsxyd; ++j) {
-            m_a2_div_sigmaw += - alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[10].elem_dofs()[j];
+            m_a2_div_sigmaw +=  alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 0] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[10].elem_dofs()[j];
             m_a2_div_sigmaw += - alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsxyd[j * dim_offset_grad + 0] * (real_num_mov)unknowns_local[10].elem_dofs()[j];
         }
         for (unsigned j = 0; j < nDofs_wsyyd; ++j) {
-            m_a2_div_sigmaw += - alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[11].elem_dofs()[j];
+            m_a2_div_sigmaw +=  alpha_2 * (real_num_mov)gradphi_w[i * dim_offset_grad + 1] * (real_num_mov)gradphi_wsyyd[j * dim_offset_grad + 1] * (real_num_mov)unknowns_local[11].elem_dofs()[j];
         }
     }
 
@@ -1759,7 +1759,7 @@ for (unsigned i = 0; i < nDofs_wsyyd; ++i) {
         }
 
         // Optional printing
-        constexpr bool print_algebra_local = false;
+        constexpr bool print_algebra_local = true;
         if (print_algebra_local) {
             std::vector<unsigned> Sol_n_el_dofs_Mat_vol = unk_num_elem_dofs;
             assemble_jacobian<double,double>::print_element_jacobian(iel, unk_element_jac_res.jac(), Sol_n_el_dofs_Mat_vol, 10, 5);

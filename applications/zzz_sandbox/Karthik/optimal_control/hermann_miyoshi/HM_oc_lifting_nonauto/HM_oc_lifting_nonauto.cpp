@@ -1162,9 +1162,9 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 5;
+    unsigned max_number_of_meshes = 6;
 
-        if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
+        if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 6;
 
     // Auxiliary mesh for incremental refinement
     MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
