@@ -1187,13 +1187,22 @@ int main(int argc, char** args) {
         &analytical_w_solution, &analytical_wsxxd_solution, &analytical_wsxyd_solution, &analytical_wsyyd_solution
     };
 
+ FEOrder fe_orders[] = { FIRST, SERENDIPITY, SECOND };
+   unsigned num_orders = 3;
+
+
+ for (unsigned o_idx = 0; o_idx < num_orders; o_idx++) {
+    FEOrder current_order = fe_orders[o_idx];
+
     for (unsigned u_idx = 0; u_idx < 12; u_idx++) {
         unknowns[u_idx]._name = unknown_names[u_idx];
         unknowns[u_idx]._fe_family = LAGRANGE;
-        unknowns[u_idx]._fe_order = FIRST; // Can be varied in convergence study
+        unknowns[u_idx]._fe_order = current_order; // Can be varied in convergence study
         unknowns[u_idx]._time_order = 0;
         unknowns[u_idx]._is_pde_unknown = true;
     }
+
+
     // ======= Unknowns - END ========================
 
     // ======= Unknowns, Analytical functions - BEGIN ================
@@ -1234,6 +1243,7 @@ int main(int argc, char** args) {
         Solution_set_initial_conditions,
         SetBoundaryCondition_bc_all_dirichlet_homogeneous
     );
+ }
 
     return 0;
 }

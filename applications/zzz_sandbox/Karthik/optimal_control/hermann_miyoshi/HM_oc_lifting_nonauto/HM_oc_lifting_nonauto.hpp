@@ -42,8 +42,8 @@ using namespace femus;
 //  Regularization parameters (file scope, mirroring the distributed-control
 //  nonauto convention).  Adjust here only.
 // =============================================================================
-static constexpr double alpha_0 = 0.0001;
-static constexpr double alpha_1 = 0.0001;
+static constexpr double alpha_0 = 0.000001;
+static constexpr double alpha_1 = 0.000001;
 static constexpr double alpha_2 = 0.001;
 
 
