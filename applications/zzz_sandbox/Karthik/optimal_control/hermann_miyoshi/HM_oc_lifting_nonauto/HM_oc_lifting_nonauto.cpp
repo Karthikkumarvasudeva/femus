@@ -896,7 +896,7 @@ template <class type = double>
 class Function_One : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return 1.0;
+        return 2.0;
     }
     std::vector<type> gradient(const std::vector<type>& x) const {
          std::vector<type> solGrad(x.size(), 0.);
@@ -980,8 +980,7 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
     // Primal / adjoint / control: pull from analytical (zero for u, ud;
     // g(x)q(y) for w via Function_W_Lifting)
     if (!strcmp(SolName, "u") ||
-        !strcmp(SolName, "ud") ||
-        !strcmp(SolName, "w"))
+        !strcmp(SolName, "ud"))
     {
         Math::Function<double>* exact_sol =
             ml_prob->get_ml_solution()->get_analytical_function(SolName);
