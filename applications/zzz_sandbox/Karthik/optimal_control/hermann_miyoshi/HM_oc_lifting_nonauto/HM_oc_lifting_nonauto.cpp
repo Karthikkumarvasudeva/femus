@@ -896,7 +896,7 @@ template <class type = double>
 class Function_One : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return 2.0;
+        return 1.0;
     }
     std::vector<type> gradient(const std::vector<type>& x) const {
          std::vector<type> solGrad(x.size(), 0.);
@@ -1000,6 +1000,38 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
 // // //         Value = exact_sol->value(x);
 // // //         return true;
 // // //     }
+
+ // // // if (!strcmp(SolName, "w"))
+ // // //    {
+ // // //        // facename == 2 is the right boundary for the square_-0p5-0p5 mesh
+ // // //        // (check your .med file if this index is different)
+ // // //        if (facename == 2)
+ // // //        {
+ // // //            Math::Function<double>* f =
+ // // //                ml_prob->get_ml_solution()->get_analytical_function(SolName);
+ // // //            Value = f->value(x);
+ // // //            return true;   // Dirichlet, nonhomogeneous
+ // // //        }
+ // // //        else
+ // // //        {
+ // // //            Value = 0.0;
+ // // //            return true;   // Dirichlet, homogeneous on other faces
+ // // //        }
+ // // //    }
+
+    if (!strcmp(SolName, "w"))
+{
+    if (std::abs(x[0] - 0.5) < 1.e-10)   // right side: x = +0.5
+    {
+        Value = 1.0;
+        return true;   // Dirichlet, nonhomogeneous
+    }
+    else
+    {
+        Value = 0.0;
+        return false;   // natural BC on all other sides
+    }
+}
 
     // Fallback (should not be hit if all 12 names handled above)
     Value = 0.0;
@@ -1161,7 +1193,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 6;
+    unsigned max_number_of_meshes = 5;
 
         if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 6;
 
