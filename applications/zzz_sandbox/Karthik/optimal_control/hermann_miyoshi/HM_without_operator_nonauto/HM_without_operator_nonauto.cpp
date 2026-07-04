@@ -16,18 +16,18 @@
 #include "Files.hpp"
 #include "MultiLevelProblem.hpp"
 #include "MultiLevelSolution.hpp"
-//#include "LinearImplicitSystem.hpp"
+#include "NonLinearImplicitSystem.hpp"
 #include "LinearEquationSolver.hpp"
 #include "VTKWriter.hpp"
 #include "NumericVector.hpp"
+
+//#include "biharmonic_coupled.hpp"
+
 #include "FE_convergence.hpp"
+
 #include "Solution_functions_over_domains_or_mesh_files.hpp"
 
-#include <cmath>
-#include <cstring>
-
-
-// // // #include "adept.h"
+#include "adept.h"
 // // // extern Domains::square_m05p05::Function_Zero_on_boundary_4<double> analytical_function;
 
 
@@ -48,7 +48,7 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-    static constexpr double a = alpha;
+    static constexpr double a = 0.0000000001;
 
 template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
@@ -329,7 +329,6 @@ private:
 };
 */
 
-
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_u_dr : public Math::Function<type> {
 
@@ -410,99 +409,54 @@ static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr<> sou
  * @brief Sets initial conditions based on analytical solutions.
  */
 double Solution_set_initial_conditions_with_analytical_sol(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char * SolName) {
-//     /*/*double value ;
-//     if (!strcmp(SolName, "u")) {
-// // // //         value = analytical_u_solution.value(x);
-//                 value = 0.;
-//     } else if (!strcmp(SolName, "sxx")) {
-// // // //         value = analytical_sxx_solution.value(x);
-//                 value = 0.;
-//     } else if (!strcmp(SolName, "sxy")) {
-// // // //         value = analytical_sxy_solution.value(x);
-//                 value = 0.;
-//
-//     } else if (!strcmp(SolName, "syy")) {
-// // // //         value = analytical_syy_solution.value(x);
-//                 value = 0.;
-//
-//     } else if (!strcmp(SolName, "ud")) {
-// // // //         value = analytical_ud_solution.value(x);
-//                 value = 0.;
-//
-//     } else if (!strcmp(SolName, "sxxd")) {
-// // // //         value = analytical_sxxd_solution.value(x);
-//                 value = 0.;
-//
-//     } else if (!strcmp(SolName, "sxyd")) {
-// // // //         value = analytical_sxyd_solution.value(x);
-//                 value = 0.;
-//
-//     } else if (!strcmp(SolName, "syyd")) {
-// // // //         value = analytical_syyd_solution.value(x);
-//                 value = 0.;
-//
-//     } else if (!strcmp(SolName, "q")) {
-// // // //         value = analytical_q_solution.value(x);
-//                 value = 0.;
-//
-//     }
-//     return value;*/*/
-
-    Math::Function<double>* exact_sol =
-        ml_prob->get_ml_solution()->get_analytical_function(SolName);
-    return exact_sol->value(x);
+    double value = 0.0;
+    if (!strcmp(SolName, "u")) {
+        value = analytical_u_solution.value(x);
+    } else if (!strcmp(SolName, "sxx")) {
+        value = analytical_sxx_solution.value(x);
+    } else if (!strcmp(SolName, "sxy")) {
+        value = analytical_sxy_solution.value(x);
+    } else if (!strcmp(SolName, "syy")) {
+        value = analytical_syy_solution.value(x);
+    } else if (!strcmp(SolName, "ud")) {
+        value = analytical_ud_solution.value(x);
+    } else if (!strcmp(SolName, "sxxd")) {
+        value = analytical_sxxd_solution.value(x);
+    } else if (!strcmp(SolName, "sxyd")) {
+        value = analytical_sxyd_solution.value(x);
+    } else if (!strcmp(SolName, "syyd")) {
+        value = analytical_syyd_solution.value(x);
+    } else if (!strcmp(SolName, "q")) {
+        value = analytical_q_solution.value(x);
+    }
+    return value;
 }
 
 /**
  * @brief Sets homogeneous Dirichlet boundary conditions.
  */
 bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
-//     /*/*bool dirichlet = true;
-//     if (!strcmp(SolName, "u")) {
-//         Value = analytical_u_solution.value(x);
-//     } else if (!strcmp(SolName, "sxx")) {
-//         Value = analytical_sxx_solution.value(x);
-//     } else if (!strcmp(SolName, "sxy")) {
-//         Value = analytical_sxy_solution.value(x);
-//     } else if (!strcmp(SolName, "syy")) {
-//         Value = analytical_syy_solution.value(x);
-//     } else if (!strcmp(SolName, "ud")) {
-//         Value = analytical_ud_solution.value(x);
-//     } else if (!strcmp(SolName, "sxxd")) {
-//         Value = analytical_sxxd_solution.value(x);
-//     } else if (!strcmp(SolName, "sxyd")) {
-//         Value = analytical_sxyd_solution.value(x);
-//     } else if (!strcmp(SolName, "syyd")) {
-//         Value = analytical_syyd_solution.value(x);
-//     } else if (!strcmp(SolName, "q")) {
-//         Value = analytical_q_solution.value(x);
-//     }
-//     return dirichlet;*/*/
-
-     if (!strcmp(SolName, "u")) {
-        Math::Function<double>* exact_sol =
-            ml_prob->get_ml_solution()->get_analytical_function(SolName);
-        Value = exact_sol->value(x);
-        return true;   // Dirichlet for u
+    bool dirichlet = true;
+    if (!strcmp(SolName, "u")) {
+        Value = analytical_u_solution.value(x);
+    } else if (!strcmp(SolName, "sxx")) {
+        Value = analytical_sxx_solution.value(x);
+    } else if (!strcmp(SolName, "sxy")) {
+        Value = analytical_sxy_solution.value(x);
+    } else if (!strcmp(SolName, "syy")) {
+        Value = analytical_syy_solution.value(x);
+    } else if (!strcmp(SolName, "ud")) {
+        Value = analytical_ud_solution.value(x);
+    } else if (!strcmp(SolName, "sxxd")) {
+        Value = analytical_sxxd_solution.value(x);
+    } else if (!strcmp(SolName, "sxyd")) {
+        Value = analytical_sxyd_solution.value(x);
+    } else if (!strcmp(SolName, "syyd")) {
+        Value = analytical_syyd_solution.value(x);
+    } else if (!strcmp(SolName, "q")) {
+        Value = analytical_q_solution.value(x);
     }
-
-    // ud : primary adjoint -- ALSO Dirichlet.
-     // The adjoint state mu satisfies the same boundary conditions as u
-     // (since it is the Lagrange multiplier for the state PDE, which is
-     // pinned to u = 0 on dOmega).  Leaving ud free destroys the entire
-     // adjoint block: u and q converge but sxxd, sxyd, syyd converge to
-     // garbage because the adjoint Hessian (sigma_d = -Hess(mu)) has no
-     // boundary anchor.
-     if (!strcmp(SolName, "ud")) {
-        Math::Function<double>* exact_sol =
-            ml_prob->get_ml_solution()->get_analytical_function(SolName);
-        Value = exact_sol->value(x);
-        return true;   // Dirichlet for ud
-    }
-
-    // sxx, sxy, syy : NO Dirichlet  (natural / free in the variational sense)
-    Value = 0.;
-    return false;
+    return dirichlet;
 }
 
 /**
@@ -531,7 +485,7 @@ void System_assemble_interface_StressBased(MultiLevelProblem& ml_prob) {
 
     // Call the stress-based assembly function - CORRECTED CALL
     // Use the actual function name from your header file
-    NAMESPACE_FOR_BIHARMONIC_HM::biharmonic_HM_without_operator_nonauto::AssembleBilaplaceProblem_AD_HM_nonauto(
+    NAMESPACE_FOR_BIHARMONIC_HM::biharmonic_HM_without_operator_nonauto::AssembleBilaplaceProblem_AD(
         elem_all,
         elem_all_for_domain,
         ml_prob.GetQuadratureRuleAllGeomElems(),
@@ -683,7 +637,7 @@ int main(int argc, char** args) {
     // ======= Quad Rule - END ========================
 
     // ======= Convergence study setup - BEGIN ========================
-    unsigned max_number_of_meshes = 6;
+    unsigned max_number_of_meshes = 8;
     if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 5;
 
     // Auxiliary mesh for incremental refinement
@@ -709,7 +663,7 @@ int main(int argc, char** args) {
     for (unsigned u_idx = 0; u_idx < 9; u_idx++) {
         unknowns[u_idx]._name = unknown_names[u_idx];
         unknowns[u_idx]._fe_family = LAGRANGE;
-        unknowns[u_idx]._fe_order = SECOND; // Can be varied in convergence study
+        unknowns[u_idx]._fe_order = FIRST; // Can be varied in convergence study
         unknowns[u_idx]._time_order = 0;
         unknowns[u_idx]._is_pde_unknown = true;
     }
@@ -733,8 +687,8 @@ int main(int argc, char** args) {
     // ======= System Specifics for Stress-Based Problem - END ==================
 
     // Various choices for convergence study
-    std::vector < bool > convergence_rate_computation_method_Flag = {true, false};
-    std::vector < bool > volume_or_boundary_Flag = {true, false};
+    std::vector < bool > convergence_rate_computation_method_Flag = {true, true};
+    std::vector < bool > volume_or_boundary_Flag = {true, true};
     std::vector < bool > sobolev_norms_Flag = {true, true};
 
     // ======= Perform Convergence Study ========================

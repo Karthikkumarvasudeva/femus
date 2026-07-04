@@ -28,6 +28,9 @@
 #include "Solution_functions_over_domains_or_mesh_files.hpp"
 
 #include "adept.h"
+
+#include <cmath>
+#include <iostream>
 // // // extern Domains::square_m05p05::Function_Zero_on_boundary_4<double> analytical_function;
 
 
@@ -37,7 +40,7 @@
    #include "01_biharmonic_coupled.hpp"
    #define NAMESPACE_FOR_BIHARMONIC   femus
 #elif LIBRARY_OR_USER == 1
-   #include "HM_oc_lifting.hpp"
+   #include "HM_oc_lifting_nonauto.hpp"
    #define NAMESPACE_FOR_BIHARMONIC_HM   karthik
 #endif
 
@@ -48,57 +51,8 @@ using namespace femus;
 namespace Domains {
 
 namespace  square_m05p05  {
-     // static constexpr double a = 0.000001;
 
-// =========================================================================
-//  Manufactured solution for HM boundary control via lifting on [-0.5, 0.5]^2
-//
-//  Geometry / regions
-//    Domain     :  Omega    = (-0.5, 0.5)^2
-//    Control    :  Gamma_c  = { x = +0.5 }   (right edge only)
-//    Observe    :  Omega_t  = Omega          (whole domain, for clean math)
-//    Lift supp  :  Omega_c  = Omega          (global, see notes in cpp)
-//
-//  Choice of primaries
-//    u   (state)        clamped: u = 0 AND grad u . n = 0 on dOmega
-//                       => u = q(x) q(y)  with  q(s) = (1/4 - s^2)^2
-//
-//    w   (control/lift) nonzero Dirichlet ONLY on Gamma_c, zero Neumann on
-//                       all of dOmega
-//                       => w = g(x) q(y)
-//                          g(x) = (x + 1/2)^2 (3 - 4 x^2)
-//
-//    ud  (adjoint)      clamped, algebraically independent of u
-//                       => ud = c(x) c(y) with  c(s) = cos^2( pi s )
-//
-//  All sigma tensors are the Hessians of the corresponding primary
-//  (convention sigma = +Hess, matching the assembly).
-//
-//  Sources fed to the assembly
-//    f         = Delta^2 ( u + w )                 (state PDE)
-//    u_dr (uD) = u + w + Delta^2 ud                 (adjoint PDE balance)
-//    g_opt     = alpha_0 w - alpha_1 Delta w        (optimality balance)
-//                              - alpha_2 Delta^2 w
-//
-//  We KEEP all original class names (Function_Zero_on_boundary_7_*) so the
-//  rest of the code does not need to be renamed.  Only the function BODIES
-//  change to encode the corrected manufactured expressions.
-// =========================================================================
-
-
-//  -- u  : CLAMPED TRIG,  u = c(x) c(y) where c(s) = cos^2(pi s) -------
-//
-//     c(+/-1/2) = cos^2(+/- pi/2) = 0         (Dirichlet = 0)
-//     c'(s) = -pi sin(2 pi s),  c'(+/-1/2) = -pi sin(+/-pi) = 0  (Neumann = 0)
-//
-//     Using the SAME trig family as ud (adjoint) — they'll have identical
-//     manufactured analyticals, but that's OK for this MMS convergence test.
-//     The key: this family is KNOWN to work (ud converges cleanly), and has
-//     O(1) magnitude (unlike the polynomial q which has max ~ 0.004).
-// -----------------------------------------------------------------------
-
-/*
-template <class type = double>
+      template <class type = double>
 class Function_Zero_on_boundary_7 : public Math::Function<type> {
 
 public:
@@ -125,41 +79,7 @@ private:
     static constexpr double pi = acos(-1.);
 };
 
-//  -- Delta u  =  cpp(x) c(y) + c(x) cpp(y) ------------------------------
-template <class type = double>
-class Function_Zero_on_boundary_7_Laplacian : public Math::Function<type> {
-
-public:
-    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
-    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
-    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
-
-    type value(const std::vector<type>& x) const {
-        return cpp(x[0]) * c(x[1]) + c(x[0]) * cpp(x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
-        const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
-        solGrad[0] = cppp_x * c (x[1]) + cp (x[0]) * cpp(x[1]);
-        solGrad[1] = cpp(x[0]) * cp(x[1]) + c  (x[0]) * cppp_y;
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-        // Delta(Delta u) = cpppp c + 2 cpp cpp + c cpppp
-        const type cpppp_x = 8.*pi*pi*pi*pi * cos(2.*pi*x[0]);
-        const type cpppp_y = 8.*pi*pi*pi*pi * cos(2.*pi*x[1]);
-        return cpppp_x * c(x[1]) + 2. * cpp(x[0]) * cpp(x[1]) + c(x[0]) * cpppp_y;
-    }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
-
-
-//  -- sigma_xx  =  u_xx  =  cpp(x) c(y) ----------------------------------
+//  -- sigma_xxd (adjoint sigma_xx) = d^2 ud / dx^2 = cpp(x) c(y)  ---------
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_sxx : public Math::Function<type> {
 
@@ -175,12 +95,13 @@ public:
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
         const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
-        solGrad[0] = cppp_x  * c (x[1]);
+        solGrad[0] = cppp_x * c (x[1]);
         solGrad[1] = cpp(x[0]) * cp(x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
+        // cpppp(x) c(y) + cpp(x) cpp(y); cpppp = 8 pi^4 cos(2pi s)
         const type cpppp_x = 8.*pi*pi*pi*pi * cos(2.*pi*x[0]);
         return cpppp_x * c(x[1]) + cpp(x[0]) * cpp(x[1]);
     }
@@ -189,7 +110,9 @@ private:
     static constexpr double pi = acos(-1.);
 };
 
-//  -- sigma_xy  =  u_xy  =  cp(x) cp(y) ----------------------------------
+
+
+//  -- sigma_xyd (adjoint sigma_xy) = d^2 ud / (dx dy) = cp(x) cp(y) -------
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_sxy : public Math::Function<type> {
 
@@ -209,6 +132,7 @@ public:
     }
 
     type laplacian(const std::vector<type>& x) const {
+        // d^2(cp cp)/dx^2 + d^2(.)/dy^2 = cppp(x) cp(y) + cp(x) cppp(y)
         const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
         const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
         return cppp_x * cp(x[1]) + cp(x[0]) * cppp_y;
@@ -218,7 +142,7 @@ private:
     static constexpr double pi = acos(-1.);
 };
 
-//  -- sigma_yy  =  u_yy  =  c(x) cpp(y) ----------------------------------
+//  -- sigma_yyd (adjoint sigma_yy) = d^2 ud / dy^2 = c(x) cpp(y) ----------
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_syy : public Math::Function<type> {
 
@@ -247,188 +171,8 @@ public:
 private:
     static constexpr double pi = acos(-1.);
 };
-*/
 
 
-template <class type = double>
-class Function_Zero_on_boundary_7 : public Math::Function<type> {
-public:
-
-    static type q    (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
-
-    static type qp   (const type s) { return -s + 4.*s*s*s; }
-
-    static type qpp  (const type s) { return -1. + 12.*s*s; }
-
-    static type qppp (const type s) { return -12.*s + 48.*s*s*s; }
-
-    static type qpppp(const type s) { return -12. + 144.*s*s; }
-
-    type value(const std::vector<type>& x) const {
-        return q(x[0]) * q(x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-
-        std::vector<type> solGrad(x.size(), 0.);
-
-        solGrad[0] = qp(x[0]) * q (x[1]);
-        solGrad[1] = q (x[0]) * qp(x[1]);
-
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-
-        return qpp(x[0]) * q(x[1])
-             + q(x[0]) * qpp(x[1]);
-    }
-};
-
-
-//  -- Delta u  =  cpp(x) c(y) + c(x) cpp(y) ------------------------------
-template <class type = double>
-class Function_Zero_on_boundary_7_Laplacian : public Math::Function<type> {
-
-public:
-    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
-    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
-    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
-
-    type value(const std::vector<type>& x) const {
-        return cpp(x[0]) * c(x[1]) + c(x[0]) * cpp(x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
-        const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
-        const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
-        solGrad[0] = cppp_x * c (x[1]) + cp (x[0]) * cpp(x[1]);
-        solGrad[1] = cpp(x[0]) * cp(x[1]) + c  (x[0]) * cppp_y;
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-        // Delta(Delta u) = cpppp c + 2 cpp cpp + c cpppp
-        const type cpppp_x = 8.*pi*pi*pi*pi * cos(2.*pi*x[0]);
-        const type cpppp_y = 8.*pi*pi*pi*pi * cos(2.*pi*x[1]);
-        return cpppp_x * c(x[1]) + 2. * cpp(x[0]) * cpp(x[1]) + c(x[0]) * cpppp_y;
-    }
-
-private:
-    static constexpr double pi = acos(-1.);
-};
-
-
-//  -- sigma_xx  =  u_xx  =  cpp(x) c(y) ----------------------------------
-template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_sxx : public Math::Function<type> {
-
-public:
-
-    static type c   (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
-
-    static type cp  (const type s) { return -s + 4.*s*s*s; }
-
-    static type cpp (const type s) { return -1. + 12.*s*s; }
-
-    static type cppp(const type s) { return 24.*s; }
-
-    static type cpppp(const type)  { return 24.; }
-
-    type value(const std::vector<type>& x) const {
-
-        return cpp(x[0]) * c(x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-
-        std::vector<type> solGrad(x.size(), 0.);
-
-        solGrad[0] = cppp(x[0]) * c (x[1]);
-        solGrad[1] = cpp (x[0]) * cp(x[1]);
-
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-
-        return cpppp(x[0]) * c(x[1])
-             + cpp(x[0]) * cpp(x[1]);
-    }
-};
-
-//  -- sigma_xy  =  u_xy  =  cp(x) cp(y) ----------------------------------
-template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_sxy : public Math::Function<type> {
-
-public:
-
-    static type cp  (const type s) { return -s + 4.*s*s*s; }
-
-    static type cpp (const type s) { return -1. + 12.*s*s; }
-
-    static type cppp(const type s) { return 24.*s; }
-
-    type value(const std::vector<type>& x) const {
-
-        return cp(x[0]) * cp(x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-
-        std::vector<type> solGrad(x.size(), 0.);
-
-        solGrad[0] = cpp(x[0]) * cp (x[1]);
-        solGrad[1] = cp (x[0]) * cpp(x[1]);
-
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-
-        return cppp(x[0]) * cp(x[1])
-             + cp(x[0])   * cppp(x[1]);
-    }
-};
-
-//  -- sigma_yy  =  u_yy  =  c(x) cpp(y) ----------------------------------
-template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_syy : public Math::Function<type> {
-
-public:
-
-    static type c   (const type s) { return (0.25 - s*s) * (0.25 - s*s); }
-
-    static type cp  (const type s) { return -s + 4.*s*s*s; }
-
-    static type cpp (const type s) { return -1. + 12.*s*s; }
-
-    static type cppp(const type s) { return 24.*s; }
-
-    static type cpppp(const type)  { return 24.; }
-
-    type value(const std::vector<type>& x) const {
-
-        return c(x[0]) * cpp(x[1]);
-    }
-
-    std::vector<type> gradient(const std::vector<type>& x) const {
-
-        std::vector<type> solGrad(x.size(), 0.);
-
-        solGrad[0] = cp(x[0]) * cpp (x[1]);
-        solGrad[1] = c (x[0]) * cppp(x[1]);
-
-        return solGrad;
-    }
-
-    type laplacian(const std::vector<type>& x) const {
-
-        return cpp(x[0]) * cpp(x[1])
-             + c(x[0]) * cpppp(x[1]);
-    }
-};
 
 
 //  -- w (lifting / boundary control)
@@ -446,135 +190,128 @@ template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_w : public Math::Function<type> {
 
 public:
-    static type q   (const type s) { const type a = 0.25 - s*s; return a*a; }
-    static type qp  (const type s) { return -s + 4.*s*s*s; }
-    static type qpp (const type s) { return -1. + 12.*s*s; }
+    static type q   (const type s) { const type a = (type)0.25 - s*s; return a*a; }
+    static type qp  (const type s) { return (type)(-1.)*s + (type)4.*s*s*s; }
+    static type qpp (const type s) { return (type)(-1.) + (type)12.*s*s; }
 
-    static type g   (const type s) {
-        // (s + 1/2)^2 (3 - 4 s^2)
-        return -4.*s*s*s*s - 4.*s*s*s + 2.*s*s + 3.*s + 0.75;
-    }
-    static type gp  (const type s) {
-        return -16.*s*s*s - 12.*s*s + 4.*s + 3.;
-    }
-    static type gpp (const type s) {
-        return -48.*s*s - 24.*s + 4.;
-    }
+    // f(x) = cos(pi x) + 1,  f'(x) = -pi sin(pi x),  f''(x) = -pi^2 cos(pi x)
+    static type f   (const type s) { return cos(pi*s) + (type)1.; }
+    static type fp  (const type s) { return -pi * sin(pi*s); }
+    static type fpp (const type s) { return -pi*pi * cos(pi*s); }
 
     type value(const std::vector<type>& x) const {
-        return g(x[0]) * q(x[1]);
+        return f(x[0]) * q(x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = gp(x[0]) * q (x[1]);
-        solGrad[1] = g (x[0]) * qp(x[1]);
+        solGrad[0] = fp(x[0]) * q (x[1]);
+        solGrad[1] = f (x[0]) * qp(x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return gpp(x[0]) * q(x[1]) + g(x[0]) * qpp(x[1]);
+        return fpp(x[0]) * q(x[1]) + f(x[0]) * qpp(x[1]);
     }
 
 private:
     static constexpr double pi = acos(-1.);
 };
 
-//  -- sigma_w,xx  =  d^2 w / dx^2  =  gpp(x) q(y)  ------------------------
+//  -- sigma_xxd (adjoint sigma_xx) = d^2 ud / dx^2 = cpp(x) c(y)  ---------
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_wsxx : public Math::Function<type> {
 
 public:
-    static type q   (const type s) { const type a = 0.25 - s*s; return a*a; }
-    static type qp  (const type s) { return -s + 4.*s*s*s; }
-    static type qpp (const type s) { return -1. + 12.*s*s; }
-    static type gpp (const type s) { return -48.*s*s - 24.*s + 4.; }
+    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
+    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
+    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
 
     type value(const std::vector<type>& x) const {
-        return gpp(x[0]) * q(x[1]);
+        return cpp(x[0]) * c(x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        const type gppp_x = -96.*x[0] - 24.;
-        solGrad[0] = gppp_x  * q (x[1]);
-        solGrad[1] = gpp(x[0]) * qp(x[1]);
+        const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
+        solGrad[0] = cppp_x * c (x[1]);
+        solGrad[1] = cpp(x[0]) * cp(x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        // gpppp(x) q(y) + gpp(x) qpp(y)  ;  gpppp = -96
-        return -96. * q(x[1]) + gpp(x[0]) * qpp(x[1]);
+        // cpppp(x) c(y) + cpp(x) cpp(y); cpppp = 8 pi^4 cos(2pi s)
+        const type cpppp_x = 8.*pi*pi*pi*pi * cos(2.*pi*x[0]);
+        return cpppp_x * c(x[1]) + cpp(x[0]) * cpp(x[1]);
     }
 
 private:
     static constexpr double pi = acos(-1.);
 };
 
-//  -- sigma_w,xy  =  d^2 w / (dx dy)  =  gp(x) qp(y)  ---------------------
+
+
+//  -- sigma_xyd (adjoint sigma_xy) = d^2 ud / (dx dy) = cp(x) cp(y) -------
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_wsxy : public Math::Function<type> {
 
 public:
-    static type qp  (const type s) { return -s + 4.*s*s*s; }
-    static type qpp (const type s) { return -1. + 12.*s*s; }
-    static type gp  (const type s) { return -16.*s*s*s - 12.*s*s + 4.*s + 3.; }
-    static type gpp (const type s) { return -48.*s*s - 24.*s + 4.; }
+    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
+    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
 
     type value(const std::vector<type>& x) const {
-        return gp(x[0]) * qp(x[1]);
+        return cp(x[0]) * cp(x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        solGrad[0] = gpp(x[0]) * qp (x[1]);
-        solGrad[1] = gp (x[0]) * qpp(x[1]);
+        solGrad[0] = cpp(x[0]) * cp (x[1]);
+        solGrad[1] = cp (x[0]) * cpp(x[1]);
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        // d^2(gp qp)/dx^2 + d^2(.)/dy^2 = gppp(x) qp(y) + gp(x) qppp(y)
-        const type gppp_x = -96.*x[0] - 24.;
-        const type qppp_y = 24. * x[1];
-        return gppp_x * qp(x[1]) + gp(x[0]) * qppp_y;
+        // d^2(cp cp)/dx^2 + d^2(.)/dy^2 = cppp(x) cp(y) + cp(x) cppp(y)
+        const type cppp_x = 4.*pi*pi*pi * sin(2.*pi*x[0]);
+        const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
+        return cppp_x * cp(x[1]) + cp(x[0]) * cppp_y;
     }
 
 private:
     static constexpr double pi = acos(-1.);
 };
 
-//  -- sigma_w,yy  =  d^2 w / dy^2  =  g(x) qpp(y)  ------------------------
+//  -- sigma_yyd (adjoint sigma_yy) = d^2 ud / dy^2 = c(x) cpp(y) ----------
 template <class type = double>
 class Function_Zero_on_boundary_7_deviatoric_wsyy : public Math::Function<type> {
 
 public:
-    static type qp  (const type s) { return -s + 4.*s*s*s; }
-    static type qpp (const type s) { return -1. + 12.*s*s; }
-    static type g   (const type s) {
-        return -4.*s*s*s*s - 4.*s*s*s + 2.*s*s + 3.*s + 0.75;
-    }
-    static type gp  (const type s) { return -16.*s*s*s - 12.*s*s + 4.*s + 3.; }
-    static type gpp (const type s) { return -48.*s*s - 24.*s + 4.; }
+    static type c   (const type s) { const type cps = cos(pi*s); return cps*cps; }
+    static type cp  (const type s) { return -pi * sin(2.*pi*s); }
+    static type cpp (const type s) { return -2.*pi*pi * cos(2.*pi*s); }
 
     type value(const std::vector<type>& x) const {
-        return g(x[0]) * qpp(x[1]);
+        return c(x[0]) * cpp(x[1]);
     }
 
     std::vector<type> gradient(const std::vector<type>& x) const {
         std::vector<type> solGrad(x.size(), 0.);
-        const type qppp_y = 24. * x[1];
-        solGrad[0] = gp(x[0]) * qpp(x[1]);
-        solGrad[1] = g (x[0]) * qppp_y;
+        const type cppp_y = 4.*pi*pi*pi * sin(2.*pi*x[1]);
+        solGrad[0] = cp(x[0]) * cpp(x[1]);
+        solGrad[1] = c (x[0]) * cppp_y;
         return solGrad;
     }
 
     type laplacian(const std::vector<type>& x) const {
-        return gpp(x[0]) * qpp(x[1]) + g(x[0]) * 24.;
+        const type cpppp_y = 8.*pi*pi*pi*pi * cos(2.*pi*x[1]);
+        return cpp(x[0]) * cpp(x[1]) + c(x[0]) * cpppp_y;
     }
 
 private:
     static constexpr double pi = acos(-1.);
 };
+
+
 
 
 template <class type = double>
@@ -1037,136 +774,204 @@ private:
 
 
 
-template <class type = double>
-class Function_Zero_on_boundary_7_deviatoric_zero : public Math::Function<type> {
 
+
+
+
+
+// ==========================================================================
+//  No manufactured solution.  Target u_D = 1, source f = 0.
+//
+//  We register a "Function_Zero" returning 0.0 for the 12 unknowns.  The
+//  framework still needs a Math::Function<double>* per unknown for IC etc.
+//  but no analytical comparison is done -- convergence is NUMERICAL.
+//
+//  We register a "Function_SmoothBump" returning a smooth bump as the
+//  source / target u_D:  u_D(x,y) = 16 * (1/4 - x^2) * (1/4 - y^2).
+//  This is C^infty and vanishes on the boundary, so the optimal control w
+//  (and hence wsxxd/wsxyd/wsyyd = -Hess(w)) is regular and convergent.
+//  This is what source_functions[0]->value(x_gss) returns in the hpp.
+// ==========================================================================
+template <class type = double>
+class Function_Zero : public Math::Function<type> {
 public:
     type value(const std::vector<type>& x) const {
-        return 0.;
+        return (type) 0.0;
+    }
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        return std::vector<type>(x.size(), (type)0.0);
+    }
+    type laplacian(const std::vector<type>& x) const {
+        return (type) 0.0;
+    }
+};
+
+// --------------------------------------------------------------------------
+//  Function_W_Lifting:  the boundary trace for the control variable w.
+//
+//     w(x,y) = g(x) * q(y),
+//       g(s) = -4 s^4 - 4 s^3 + 2 s^2 + 3 s + 3/4   (= (s+1/2)^2 (3 - 4 s^2))
+//       q(s) = (1/4 - s^2)^2
+//
+//  Properties on the square [-1/2, +1/2]^2:
+//     q(+/-1/2) = 0,  q'(+/-1/2) = 0   (q vanishes to order 2 at the y-edges)
+//     g(-1/2)   = 0,  g(+1/2)   = 2    (lifting trace concentrated on right
+//                                       edge x = +1/2)
+//  ==> on x = -1/2, y = +/-1/2 : w = 0
+//      on x = +1/2 : w = 2 * q(y)  (nonzero, parabolic-like bump)
+//
+//  This matches the boundary trace of the working auto-diff lifting code.
+//  Used here for the NONHOMOGENEOUS Dirichlet BC on w.
+// --------------------------------------------------------------------------
+template <class type = double>
+class Function_W_Lifting : public Math::Function<type> {
+public:
+    static type q   (const type s) { return (type)(0.25 - s*s) * (type)(0.25 - s*s); }
+    static type qp  (const type s) { return (type)(-s) + (type)4.0 * s*s*s; }
+    static type qpp (const type s) { return (type)(-1.0) + (type)12.0 * s*s; }
+
+    static type g   (const type s) {
+        return (type)(-4.0)*s*s*s*s - (type)4.0*s*s*s
+             + (type)2.0*s*s + (type)3.0*s + (type)0.75;
+    }
+    static type gp  (const type s) {
+        return (type)(-16.0)*s*s*s - (type)12.0*s*s
+             + (type)4.0*s + (type)3.0;
+    }
+    static type gpp (const type s) {
+        return (type)(-48.0)*s*s - (type)24.0*s + (type)4.0;
     }
 
+    type value(const std::vector<type>& x) const {
+        return g(x[0]) * q(x[1]);
+    }
     std::vector<type> gradient(const std::vector<type>& x) const {
-        std::vector<type> solGrad(x.size(), 0.);
+        std::vector<type> sg(x.size(), (type)0.0);
+        sg[0] = gp(x[0]) * q (x[1]);
+        sg[1] = g (x[0]) * qp(x[1]);
+        return sg;
+    }
+    type laplacian(const std::vector<type>& x) const {
+        return gpp(x[0]) * q(x[1]) + g(x[0]) * qpp(x[1]);
+    }
+};
+
+// --------------------------------------------------------------------------
+//  Smooth bump target.  Peaks at ~1 in the center, vanishes on the boundary.
+//
+//     u_D(x,y) = 16 * (1/4 - x^2) * (1/4 - y^2)
+//
+//  This is C^infty, lies in H^k for all k, and (importantly) satisfies
+//  u_D = 0 on the boundary of [-1/2, 1/2]^2.  With this target, the optimal
+//  control w solving the KKT system is itself smooth, so its Hessian
+//  components wsxxd/wsxyd/wsyyd should converge cleanly.
+//
+//  Derivatives (used by gradient/laplacian, though only value() is called
+//  by the assembly):
+//     d_x u_D = -32 * x * (1/4 - y^2)
+//     d_y u_D = -32 * y * (1/4 - x^2)
+//     Lap u_D = -32 * (1/4 - y^2) - 32 * (1/4 - x^2) = -16 + 32*(x^2 + y^2)
+// --------------------------------------------------------------------------
+template <class type = double>
+class Function_SmoothBump : public Math::Function<type> {
+public:
+    type value(const std::vector<type>& x) const {
+        const type qx = (type)0.25 - x[0]*x[0];
+        const type qy = (type)0.25 - x[1]*x[1];
+        return (type)16.0 * qx * qy;
+    }
+    std::vector<type> gradient(const std::vector<type>& x) const {
+        std::vector<type> g(x.size(), (type)0.0);
+        const type qx = (type)0.25 - x[0]*x[0];
+        const type qy = (type)0.25 - x[1]*x[1];
+        g[0] = (type)(-32.0) * x[0] * qy;
+        g[1] = (type)(-32.0) * x[1] * qx;
+        return g;
+    }
+    type laplacian(const std::vector<type>& x) const {
+        return (type)(-16.0) + (type)32.0 * (x[0]*x[0] + x[1]*x[1]);
+    }
+};
+
+
+
+template <class type = double>
+class Function_One : public Math::Function<type> {
+public:
+    type value(const std::vector<type>& x) const {
+        return 1.0;
+    }
+    std::vector<type> gradient(const std::vector<type>& x) const {
+         std::vector<type> solGrad(x.size(), 0.);
         solGrad[0] = 0.;
         solGrad[1] = 0.;
         return solGrad;
     }
-
     type laplacian(const std::vector<type>& x) const {
-        return 0.;
+        return 0.0;
     }
-
-private:
-    static constexpr double pi = acos(-1.);
-
 };
 
 
+} // namespace square_m05p05
+} // namespace Domains
+
+
+// ==========================================================================
+//  Static analytical-function instances.
+//  All 12 unknowns share the same Function_Zero (returns 0 everywhere).
+//  source_function = Function_SmoothBump (target u_D = smooth bump vanishing
+//  on boundary; produces a smooth optimal control w).
+// ==========================================================================
+static Domains::square_m05p05::Function_Zero_on_boundary_7<> analytical_u_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx<> analytical_sxx_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy<> analytical_sxy_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy<> analytical_syy_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_d<> analytical_ud_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd<> analytical_sxxd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd<> analytical_sxyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd<> analytical_syyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w<> analytical_w_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_wsxx<> analytical_wsxxd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_wsxy<> analytical_wsxyd_solution;
+static Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_wsyy<> analytical_wsyyd_solution;
+static Domains::square_m05p05::Function_One<>  source_function;
+
+
+// ==========================================================================
+//  Initial conditions: zero everywhere (analytical = Function_Zero).
+// ==========================================================================
+double Solution_set_initial_conditions(const MultiLevelProblem * ml_prob,
+                                       const std::vector<double>& x,
+                                       const char * SolName)
+{
+    Math::Function<double>* exact_sol =
+        ml_prob->get_ml_solution()->get_analytical_function(SolName);
+    return exact_sol->value(x);
 }
 
 
-}
-
-
-
-//====Set boundary condition-BEGIN==============================
+// ==========================================================================
+//  Boundary conditions:
+//    u    -> HOMOGENEOUS Dirichlet  (= 0,   from analytical_u_solution)
+//    ud   -> HOMOGENEOUS Dirichlet  (= 0,   from analytical_ud_solution)
+//    w    -> NONHOMOGENEOUS Dirichlet (= g(x)q(y), from analytical_w_solution
+//                                     = Function_W_Lifting; lifting trace)
 //
-//  Boundary-condition policy: ALL fields are Dirichlet to analytical trace.
+//    sxx, sxy, syy        -> HOMOGENEOUS Dirichlet (= 0)
+//    sxxd, sxyd, syyd     -> HOMOGENEOUS Dirichlet (= 0)
+//    wsxxd, wsxyd, wsyyd  -> HOMOGENEOUS Dirichlet (= 0)
 //
-//  This matches the working state-only HM reference (HM_without_operator.cpp)
-//  which uses σ Dirichlet for sxx, sxy, syy, sxxd, sxyd, syyd. The "σ-free"
-//  natural BC approach (previously tried) does NOT work in practice — the
-//  discrete σ fails to converge to the analytical Hessian because the assembly
-//  drops a boundary term in the HM Hessian IBP.
-//
-//  All 12 unknowns: u, sxx, sxy, syy, ud, sxxd, sxyd, syyd, w, wsxxd, wsxyd, wsyyd
-//  are Dirichlet-pinned to their analytical traces on the entire boundary dOmega.
-
-
-//====Set boundary condition-BEGIN==============================
-bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(const MultiLevelProblem * ml_prob, const std::vector < double >& x, const char SolName[], double& Value, const int facename, const double time) {
-  bool dirichlet = false; //dirichlet
-
-  if (!strcmp(SolName, "u")) {
-      Math::Function <double> * u = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      // strcmp compares two string in lexiographic sense.
-    Value = u -> value(x);
-              dirichlet = true;
-
-  }
-  else if (!strcmp(SolName, "sxx")) {
-      Math::Function <double> * sxx = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxx -> value(x);
-              dirichlet = true;
-
-  }
-    else if (!strcmp(SolName, "sxy")) {
-      Math::Function <double> * sxy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxy -> value(x);
-              dirichlet = true;
-
-  }
-    else if (!strcmp(SolName, "syy")) {
-      Math::Function <double> * syy = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = syy -> value(x);
-              dirichlet = true;
-
-  }
-  else if (!strcmp(SolName, "ud")) {
-      Math::Function <double> * ud = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-      // strcmp compares two string in lexiographic sense.
-    Value = ud -> value(x);
-              dirichlet = true;
-
-  }
-  else if (!strcmp(SolName, "sxxd")) {
-      Math::Function <double> * sxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxxd -> value(x);
-              dirichlet = true;
-
-  }
-    else if (!strcmp(SolName, "sxyd")) {
-      Math::Function <double> * sxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = sxyd -> value(x);
-              dirichlet = true;
-
-  }
-    else if (!strcmp(SolName, "syyd")) {
-      Math::Function <double> * syyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = syyd -> value(x);
-              dirichlet = true;
-
-  }
-    else if (!strcmp(SolName, "w")) {
-      Math::Function <double> * w = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = w -> value(x);
-              dirichlet = true;
-
-  }
-      else if (!strcmp(SolName, "wsxxd")) {
-      Math::Function <double> * wsxxd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = wsxxd -> value(x);
-              dirichlet = true;
-
-  }
-      else if (!strcmp(SolName, "wsxyd")) {
-      Math::Function <double> * wsxyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = wsxyd -> value(x);
-              dirichlet = true;
-
-  }
-      else if (!strcmp(SolName, "wsyyd")) {
-      Math::Function <double> * wsyyd = ml_prob -> get_ml_solution() -> get_analytical_function(SolName);
-    Value = wsyyd -> value(x);
-              dirichlet = true;
-
-  }
-  return dirichlet;
-}
-//====Set boundary condition-END==============================
-
-
-/*
+//  IMPORTANT (why we Dirichlet the sigma-Hessian variables too):
+//  In this mixed Hermann-Miyoshi formulation each sigma-Hessian variable is
+//  the L2 projection of -Hess(.) of its primal partner.  With LINEAR FE the
+//  Hessian carries no in-element information, so the boundary trace of each
+//  sigma-Hessian sub-system needs an explicit anchor or the Hessian-recovery
+//  diverges under refinement.  The working AUTO-DIFF lifting code Dirichlets
+//  all 12 unknowns (to their respective analyticals).  Here we follow the
+//  same convention but use 0 on the sigma-Hessian variables since we do not
+//  have a manufactured analytical for them.
+// ==========================================================================
 bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
     const MultiLevelProblem * ml_prob,
     const std::vector<double>& x,
@@ -1175,446 +980,305 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
     const int facename,
     const double time)
 {
+    (void) ml_prob; (void) x; (void) facename; (void) time;
+    // ----------------------------------------------------------------------
+    //  ACTIVE-CONTROL boundary setup (so that minimizing J actually responds
+    //  to the regularization parameters alpha_i):
+    //
+    //    u  (= u-tilde, state)     -> homogeneous Dirichlet (= 0) on all dOmega
+    //    ud (= lambda_u, adjoint)  -> homogeneous Dirichlet (= 0) on all dOmega
+    //    w  (lifting / control)    -> NATURAL (free) on all dOmega
+    //    sxx,sxy,syy, sxxd,sxyd,syyd, wsxxd,wsxyd,wsyyd -> NATURAL
+    //
+    //  Rationale: the state constraint pins U = u+w via Delta^2 U = f with
+    //  U|_dOmega = w|_dOmega (since u = 0 there).  The control therefore acts
+    //  on the cost ONLY through the boundary trace of w.  If w is Dirichlet,
+    //  that trace is fixed and the optimization is dead (J independent of
+    //  alpha).  Leaving w free on dOmega turns its boundary trace into a true
+    //  control degree of freedom, so decreasing alpha lets the optimizer drive
+    //  U toward the target u_D = 1 and the tracking misfit goes down.
+    // ----------------------------------------------------------------------
+    if (!strcmp(SolName, "u") ||
+        !strcmp(SolName, "ud"))
+    {
+        Value = 0.0;
+        return true;          // homogeneous Dirichlet
+    }
 
-  // ============================================================
-  // HOMOGENEOUS STATE / ADJOINT VARIABLES
-  // ============================================================
-  // Total physical solution:
-  //
-  //    u_total  = u  + w
-  //    ud_total = ud + wd   (if applicable)
-  //
-  // Therefore:
-  //   u, ud are homogeneous unknowns
-  //   w carries the nonhomogeneous trace
-  // ============================================================
+    // w and all sigma-Hessian variables: NATURAL (no Dirichlet)
+    Value = 0.0;
+    return false;
+}
 
-  // ---------- primal state ----------
-  if (!strcmp(SolName, "u")) {
-      Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
 
-      Value = f->value(x);
 
-//       Value = 0.;
-      return true;
-  }
+// Interface for Manual Assembly
+template < class system_type, class real_num, class real_num_mov >
+void System_assemble_interface_StressBased(MultiLevelProblem& ml_prob) {
+    const unsigned current_system_number = ml_prob.get_current_system_number();
 
-    if (!strcmp(SolName, "sxx")) {
-      Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+    std::vector< Unknown > unknowns = ml_prob.get_system< system_type >(current_system_number).get_unknown_list_for_assembly();
 
-      Value = f->value(x);
+    std::vector< Math::Function< double > * > source_funcs_for_assembly(1);
+    source_funcs_for_assembly[0] = ml_prob.get_app_specs_pointer()->_assemble_function_for_rhs;
 
-//       Value = 0.;
-      return true;
-  }
+    std::vector < std::vector < elem_type_templ_base<real_num, real_num_mov> * > > elem_all;
+    ml_prob.get_all_abstract_fe(elem_all);
 
-    if (!strcmp(SolName, "sxy")) {
-      Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+    std::vector < std::vector < elem_type_templ_base<real_num_mov, real_num_mov> * > > elem_all_for_domain;
 
-      Value = f->value(x);
+    ml_prob.get_all_abstract_fe(elem_all_for_domain);
 
-//       Value = 0.;
-      return true;
-  }
+    NAMESPACE_FOR_BIHARMONIC_HM::biharmonic_HM_oc_lifting_nonauto::AssembleBilaplaceProblem_AD(
+        elem_all, elem_all_for_domain, ml_prob.GetQuadratureRuleAllGeomElems(),
+        &ml_prob.get_system< system_type >(current_system_number),
+        ml_prob.GetMLMesh(), ml_prob.get_ml_solution(),
+        unknowns, source_funcs_for_assembly
+    );
+}
 
-    if (!strcmp(SolName, "syy")) {
-      Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+// Solution Generation
+template < class real_num >
+class Solution_generation_StressBased : public Solution_generation_single_level {
+public:
+    const MultiLevelSolution run_on_single_level(
+        MultiLevelProblem & ml_prob,
+        MultiLevelMesh & ml_mesh_single_level,
+        const unsigned lev,
+        const std::vector< Unknown > & unknowns,
+        const std::vector< Math::Function< double > * > & exact_sol_functions,
+        const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
+        const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
+        const bool my_solution_generation_has_equation_solve
+    ) const;
+};
 
-      Value = f->value(x);
 
-//       Value = 0.;
-      return true;
-  }
+template < class real_num >
+const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_single_level(
+    MultiLevelProblem & ml_prob,
+    MultiLevelMesh & ml_mesh_single_level,
+    const unsigned lev,
+    const std::vector< Unknown > & unknowns,
+    const std::vector< Math::Function< double > * > & exact_sol_functions,
+    const MultiLevelSolution::InitFuncMLProb SetInitialCondition_in,
+    const MultiLevelSolution::BoundaryFuncMLProb SetBoundaryCondition_in,
+    const bool my_solution_generation_has_equation_solve
+) const{
+        unsigned numberOfUniformLevels = lev + 1;
+         unsigned numberOfSelectiveLevels = 0;
+        ml_mesh_single_level.RefineMesh(numberOfUniformLevels, numberOfUniformLevels + numberOfSelectiveLevels, NULL);
+        ml_mesh_single_level.EraseCoarseLevels(numberOfUniformLevels - 1);
+        ml_mesh_single_level.PrintInfo();
 
-  // ---------- adjoint ----------
-  if (!strcmp(SolName, "ud")) {
-//       Value = 0.;
-Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+            if (ml_mesh_single_level.GetNumberOfLevels() != 1) {
+        std::cout << "Need single level here" << std::endl;
+        abort();
+    }
 
-      Value = f->value(x);
-      return true;
-  }
+        MultiLevelSolution ml_sol_single_level(&ml_mesh_single_level);
+        ml_sol_single_level.SetWriter(VTK);
+        ml_sol_single_level.GetWriter()->SetDebugOutput(true);
 
-  // ============================================================
-  // LIFTING FUNCTION
-  // ============================================================
 
-  if (!strcmp(SolName, "w")) {
-      Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+        ml_prob.SetMultiLevelMeshAndSolution(&ml_sol_single_level);
 
-      Value = f->value(x);
-      return true;
-  }
+        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+            ml_sol_single_level.AddSolution(unknowns[u_idx]._name.c_str(), unknowns[u_idx]._fe_family, unknowns[u_idx]._fe_order, unknowns[u_idx]._time_order, unknowns[u_idx]._is_pde_unknown);
+            ml_sol_single_level.set_analytical_function(unknowns[u_idx]._name.c_str(), exact_sol_functions[u_idx]);
+            ml_sol_single_level.Initialize(unknowns[u_idx]._name.c_str(), SetInitialCondition_in, &ml_prob);
+        }
 
-  // ============================================================
-  // CONTROL HESSIAN VARIABLES
-  // ============================================================
+        if (my_solution_generation_has_equation_solve) {
+            ml_prob.get_systems_map().clear();
 
-  if (!strcmp(SolName, "wsxxd") ||
-      !strcmp(SolName, "wsxyd") ||
-      !strcmp(SolName, "wsyyd")) {
 
-      Math::Function<double>* f =
-          ml_prob->get_ml_solution()->get_analytical_function(SolName);
+            ml_sol_single_level.AttachSetBoundaryConditionFunction(SetBoundaryCondition_in);
+            for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+                ml_sol_single_level.GenerateBdc(unknowns[u_idx]._name.c_str(), (unknowns[u_idx]._time_order == 0) ? "Steady" : "Time_dependent", &ml_prob);
+            }
 
-      Value = f->value(x);
-      return true;
-  }
+            LinearImplicitSystem& system = ml_prob.add_system< LinearImplicitSystem >("StressBasedOptimalControl");
 
-  // ============================================================
-  // STATE / ADJOINT HESSIAN VARIABLES
-  // NATURAL BCs
-  // ============================================================
 
-  // if desired later, these can be switched to strong Dirichlet
-  // for debugging consistency
+            for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++){
+                system.AddSolutionToSystemPDE(unknowns[u_idx]._name.c_str());
+            }
+            system.set_unknown_list_for_assembly(unknowns);
+            system.SetAssembleFunction(System_assemble_interface_StressBased< LinearImplicitSystem, real_num, double >);
 
-//  if (!strcmp(SolName, "sxx")  ||
-//      !strcmp(SolName, "sxy")  ||
-//      !strcmp(SolName, "syy")  ||
-//      !strcmp(SolName, "sxxd") ||
-//      !strcmp(SolName, "sxyd") ||
-//      !strcmp(SolName, "syyd")) {
-//
-//      Math::Function<double>* f =
-//          ml_prob->get_ml_solution()->get_analytical_function(SolName);
-//
-//      Value = f->value(x);
-//      return true;
-//  }
+            ml_prob.set_current_system_number(0);
+            system.init();
+            system.ClearVariablesToBeSolved();
+            system.AddVariableToBeSolved("All");
+            system.SetOuterSolver(PREONLY);
+            system.MGsolve();
 
-  Value = 0.;
-  return false;
-}*/
+            // ---------------------------------------------------------------
+            //  TRACKING-ERROR DIAGNOSTIC
+            //  Reports how close the tracked state U = u + w is to the target
+            //  u_D = 1.  This is the quantity that must DECREASE as the
+            //  regularization alpha_0, alpha_1, alpha_2 (top of the .hpp) are
+            //  reduced.  Run an alpha-sweep (e.g. 1e0, 1e-2, 1e-4, 1e-6) and
+            //  watch RMS|u+w-1| go down.
+            //  (single-level mesh here -> solution level index is 0)
+            {
+                Solution * sol_lev = ml_sol_single_level.GetSolutionLevel(0);
+                const unsigned iu = ml_sol_single_level.GetIndex("u");
+                const unsigned iw = ml_sol_single_level.GetIndex("w");
+                NumericVector * Uvec = sol_lev->_Sol[iu];
+                NumericVector * Wvec = sol_lev->_Sol[iw];
 
+                const unsigned nloc = Uvec->local_size();
+                double sum_sq = 0.0, max_abs = 0.0;
+                for (unsigned k = 0; k < nloc; ++k) {
+                    const double uk = (*Uvec)(Uvec->first_local_index() + k);
+                    const double wk = (*Wvec)(Wvec->first_local_index() + k);
+                    const double e  = uk + wk - 1.0;          // U - u_D
+                    sum_sq += e * e;
+                    if (std::fabs(e) > max_abs) max_abs = std::fabs(e);
+                }
+                const double rms = (nloc > 0) ? std::sqrt(sum_sq / (double) nloc) : 0.0;
+
+                std::cout << "\n[TRACKING-ERROR  level " << lev << "]"
+                          << "  RMS(u+w-1) = " << rms
+                          << "   max|u+w-1| = " << max_abs << "\n" << std::endl;
+            }
+        }
+
+            // Print Solutions to VTK
+    ml_sol_single_level.SetWriter(VTK);
+    ml_sol_single_level.GetWriter()->SetDebugOutput(true);
+
+        // Print output
+        for (unsigned int u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+            std::vector < std::string > variablesToBePrinted;
+            variablesToBePrinted.push_back(unknowns[u_idx]._name);
+            std::ostringstream output_filename;
+            output_filename << unknowns[u_idx]._name << "_stress_FE" << unknowns[u_idx]._fe_order << "_level" << lev;
+            ml_sol_single_level.GetWriter()->Write(output_filename.str(), ml_prob.GetFilesHandler()->GetOutputPath(), "biquadratic", variablesToBePrinted, lev);
+        }
+        return ml_sol_single_level;
+    }
 
 
 int main(int argc, char** args) {
 
-  // init Petsc-MPI communicator
-  FemusInit mpinit(argc, args, MPI_COMM_WORLD);
-
-  // ======= Files - BEGIN  ========================
-  const bool use_output_time_folder = false; // This allows you to run the code multiple times without overwriting. This will generate an output folder each time you run.
-  const bool redirect_cout_to_file = false; // puts the output in a log file instead of the term
-  Files files;
-        files.CheckIODirectories(use_output_time_folder);
-        files.RedirectCout(redirect_cout_to_file);
-
-  // ======= Files - END  ========================
-
-
-    // ======= System Specifics - BEGIN  ==================
-  system_specifics  system_biharmonic_HM;   //me
-
-  // =========Mesh file - BEGIN ==================
-  system_biharmonic_HM._mesh_files.push_back("square_-0p5-0p5x-0p5-0p5_divisions_2x2.med");
-  const std::string relative_path_to_build_directory =  "../../../../../../";
-  const std::string mesh_file = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";  system_biharmonic_HM._mesh_files_path_relative_to_executable.push_back(mesh_file);
- // =========Mesh file - END ==================
-
-
-  system_biharmonic_HM._system_name = "Biharmonic";
-  system_biharmonic_HM._assemble_function = NAMESPACE_FOR_BIHARMONIC_HM :: biharmonic_HM_oc_lifting :: AssembleBilaplaceProblem_AD;
-
-  system_biharmonic_HM._boundary_conditions_types_and_values             = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
-
-
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7 <>   system_biharmonic_HM_function_zero_on_boundary_1;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxx  <>   system_biharmonic_HM_function_zero_on_boundary_sxx;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxy  <>   system_biharmonic_HM_function_zero_on_boundary_sxy;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syy <>   system_biharmonic_HM_function_zero_on_boundary_syy;
-
-    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxxd  <>   system_biharmonic_HM_function_zero_on_boundary_sxxd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_sxyd  <>   system_biharmonic_HM_function_zero_on_boundary_sxyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_syyd <>   system_biharmonic_HM_function_zero_on_boundary_syyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_d <>   system_biharmonic_HM_function_zero_on_boundary_u_d;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_u_dr <>   system_biharmonic_HM_function_zero_on_boundary_u_dr;
-
-  // FIX: w must use its OWN class (deviatoric_w), not deviatoric_u_dr.
-  // The original code mistakenly attached u_dr (the target) as the analytical
-  // for w (the lifting control), which gave wrong analytical traces on every
-  // edge instead of nonzero trace ONLY on Gamma_c.
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_w <>   system_biharmonic_HM_function_zero_on_boundary_w;
-
-    Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_wsxx  <>   system_biharmonic_HM_function_zero_on_boundary_wsxxd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_wsxy  <>   system_biharmonic_HM_function_zero_on_boundary_wsxyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_wsyy <>   system_biharmonic_HM_function_zero_on_boundary_wsyyd;
-
-  Domains::square_m05p05::Function_Zero_on_boundary_7_Laplacian  <>   system_biharmonic_HM_function_zero_on_boundary_1_Laplacian;
-
-  // NEW: f  =  Delta^2(u+w)         -- state PDE source
-  //      g  =  alpha_0 w - alpha_1 Delta w - alpha_2 Delta^2 w   -- optimality source
-  Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_gopt <>   system_biharmonic_HM_function_zero_on_boundary_gopt;
-
-  // // Domains::square_m05p05::Function_Zero_on_boundary_7_deviatoric_f<> Function_Zero_on_boundary_7_deviatoric_f;
-
-// // //   mlSol.set_analytical_function("f", &Function_Zero_on_boundary_7_deviatoric_f);
-
-
-
-
-  system_biharmonic_HM._assemble_function_for_rhs   = & system_biharmonic_HM_function_zero_on_boundary_u_dr;
-  system_biharmonic_HM._true_solution_function      = & system_biharmonic_HM_function_zero_on_boundary_1;
-
-
-
-
-  ///@todo if this is not set, nothing happens here. It is used to compute absolute errors
-    // ======= System Specifics - END ==================
-
-
-
-  // define multilevel mesh
-  MultiLevelMesh mlMsh;
-  // read coarse level mesh and generate finers level meshes
-  double scalingFactor = 1.;
-  const std::string mesh_file_total = system_biharmonic_HM._mesh_files_path_relative_to_executable[0] + "/" + system_biharmonic_HM._mesh_files[0];
-  mlMsh.ReadCoarseMesh(mesh_file_total.c_str(), "seventh", scalingFactor);
-
-  unsigned maxNumberOfMeshes = 4;
-
-  std::vector<FEOrder> feOrder = { FIRST, SERENDIPITY, SECOND };
-
-  std::vector<std::vector<double>> l2Norm_u(maxNumberOfMeshes), semiNorm_u(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxx(maxNumberOfMeshes), semiNorm_sxx(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxy(maxNumberOfMeshes), semiNorm_sxy(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_syy(maxNumberOfMeshes), semiNorm_syy(maxNumberOfMeshes);
-
-  std::vector<std::vector<double>> l2Norm_ud(maxNumberOfMeshes), semiNorm_ud(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxxd(maxNumberOfMeshes), semiNorm_sxxd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_sxyd(maxNumberOfMeshes), semiNorm_sxyd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_syyd(maxNumberOfMeshes), semiNorm_syyd(maxNumberOfMeshes);
-
-  std::vector<std::vector<double>> l2Norm_w(maxNumberOfMeshes), semiNorm_w(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_wsxxd(maxNumberOfMeshes), semiNorm_wsxxd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_wsxyd(maxNumberOfMeshes), semiNorm_wsxyd(maxNumberOfMeshes);
-  std::vector<std::vector<double>> l2Norm_wsyyd(maxNumberOfMeshes), semiNorm_wsyyd(maxNumberOfMeshes);
-
-
-  for (unsigned i = 0; i < maxNumberOfMeshes; i++) {
-    mlMsh.RefineMesh(i + 1, i + 1, nullptr);
-    mlMsh.EraseCoarseLevels(i);
-    mlMsh.PrintInfo();
-
-
-    l2Norm_u[i].resize(feOrder.size());   semiNorm_u[i].resize(feOrder.size());
-    l2Norm_sxx[i].resize(feOrder.size()); semiNorm_sxx[i].resize(feOrder.size());
-    l2Norm_sxy[i].resize(feOrder.size()); semiNorm_sxy[i].resize(feOrder.size());
-    l2Norm_syy[i].resize(feOrder.size()); semiNorm_syy[i].resize(feOrder.size());
-
-    l2Norm_ud[i].resize(feOrder.size());  semiNorm_ud[i].resize(feOrder.size());
-    l2Norm_sxxd[i].resize(feOrder.size());semiNorm_sxxd[i].resize(feOrder.size());
-    l2Norm_sxyd[i].resize(feOrder.size());semiNorm_sxyd[i].resize(feOrder.size());
-    l2Norm_syyd[i].resize(feOrder.size());semiNorm_syyd[i].resize(feOrder.size());
-
-    l2Norm_w[i].resize(feOrder.size());   semiNorm_w[i].resize(feOrder.size());
-    l2Norm_wsxxd[i].resize(feOrder.size());semiNorm_wsxxd[i].resize(feOrder.size());
-    l2Norm_wsxyd[i].resize(feOrder.size());semiNorm_wsxyd[i].resize(feOrder.size());
-    l2Norm_wsyyd[i].resize(feOrder.size());semiNorm_wsyyd[i].resize(feOrder.size());
-
-    for (unsigned j = 0; j < feOrder.size(); j++) {
-      MultiLevelSolution mlSol(&mlMsh);
-
-      mlSol.AddSolution("u", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("u", &system_biharmonic_HM_function_zero_on_boundary_1);
-
-      mlSol.AddSolution("sxx", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx);
-
-      mlSol.AddSolution("sxy", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy);
-
-      mlSol.AddSolution("syy", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("syy", &system_biharmonic_HM_function_zero_on_boundary_syy);
-
-      mlSol.AddSolution("ud", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("ud", &system_biharmonic_HM_function_zero_on_boundary_u_d);
-
-      mlSol.AddSolution("sxxd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxxd);
-
-      mlSol.AddSolution("sxyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxyd);
-
-      mlSol.AddSolution("syyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
-
-      mlSol.AddSolution("w", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("w", &system_biharmonic_HM_function_zero_on_boundary_w);
-
-      mlSol.AddSolution("wsxxd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("wsxxd", &system_biharmonic_HM_function_zero_on_boundary_wsxxd);
-
-      mlSol.AddSolution("wsxyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("wsxyd", &system_biharmonic_HM_function_zero_on_boundary_wsxyd);
-
-      mlSol.AddSolution("wsyyd", LAGRANGE, feOrder[j]);
-      mlSol.set_analytical_function("wsyyd", &system_biharmonic_HM_function_zero_on_boundary_wsyyd);
-
-      mlSol.Initialize("All");
-
-      MultiLevelProblem ml_prob(&mlSol);
-      ml_prob.set_app_specs_pointer(&system_biharmonic_HM);
-      ml_prob.SetFilesHandler(&files);
-
-      mlSol.AttachSetBoundaryConditionFunction(system_biharmonic_HM._boundary_conditions_types_and_values);
-      mlSol.GenerateBdc("u", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxx", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxy", "Steady", &ml_prob);
-      mlSol.GenerateBdc("syy", "Steady", &ml_prob);
-
-      mlSol.GenerateBdc("ud", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxxd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("sxyd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("syyd", "Steady", &ml_prob);
-
-
-      mlSol.GenerateBdc("w", "Steady", &ml_prob);
-      mlSol.GenerateBdc("wsxxd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("wsxyd", "Steady", &ml_prob);
-      mlSol.GenerateBdc("wsyyd", "Steady", &ml_prob);
-
-      LinearImplicitSystem& system = ml_prob.add_system<LinearImplicitSystem>(system_biharmonic_HM._system_name);
-      system.AddSolutionToSystemPDE("u");
-      system.AddSolutionToSystemPDE("sxx");
-      system.AddSolutionToSystemPDE("sxy");
-      system.AddSolutionToSystemPDE("syy");
-
-      system.AddSolutionToSystemPDE("ud");
-      system.AddSolutionToSystemPDE("sxxd");
-      system.AddSolutionToSystemPDE("sxyd");
-      system.AddSolutionToSystemPDE("syyd");
-
-      system.AddSolutionToSystemPDE("w");
-      system.AddSolutionToSystemPDE("wsxxd");
-      system.AddSolutionToSystemPDE("wsxyd");
-      system.AddSolutionToSystemPDE("wsyyd");
-
-      system.SetAssembleFunction(system_biharmonic_HM._assemble_function);
-
-      system.init();
-      system.SetOuterSolver(PREONLY);
-
-      system.MGsolve();
-
-      std::pair<double, double> norm;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "u", &system_biharmonic_HM_function_zero_on_boundary_1);
-      l2Norm_u[i][j] = norm.first;
-      semiNorm_u[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxx", &system_biharmonic_HM_function_zero_on_boundary_sxx);
-      l2Norm_sxx[i][j] = norm.first;
-      semiNorm_sxx[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxy", &system_biharmonic_HM_function_zero_on_boundary_sxy);
-      l2Norm_sxy[i][j] = norm.first;
-      semiNorm_sxy[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "syy", &system_biharmonic_HM_function_zero_on_boundary_syy);
-      l2Norm_syy[i][j] = norm.first;
-      semiNorm_syy[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "ud", &system_biharmonic_HM_function_zero_on_boundary_u_d);
-      l2Norm_ud[i][j] = norm.first;
-      semiNorm_ud[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxxd", &system_biharmonic_HM_function_zero_on_boundary_sxxd);
-      l2Norm_sxxd[i][j] = norm.first;
-      semiNorm_sxxd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "sxyd", &system_biharmonic_HM_function_zero_on_boundary_sxyd);
-      l2Norm_sxyd[i][j] = norm.first;
-      semiNorm_sxyd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "syyd", &system_biharmonic_HM_function_zero_on_boundary_syyd);
-      l2Norm_syyd[i][j] = norm.first;
-      semiNorm_syyd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "w", &system_biharmonic_HM_function_zero_on_boundary_w);
-      l2Norm_w[i][j] = norm.first;
-      semiNorm_w[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsxxd", &system_biharmonic_HM_function_zero_on_boundary_wsxxd);
-      l2Norm_wsxxd[i][j] = norm.first;
-      semiNorm_wsxxd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsxyd", &system_biharmonic_HM_function_zero_on_boundary_wsxyd);
-      l2Norm_wsxyd[i][j] = norm.first;
-      semiNorm_wsxyd[i][j] = norm.second;
-
-      norm = GetErrorNorm_L2_H1_with_analytical_sol(&mlSol, "wsyyd", &system_biharmonic_HM_function_zero_on_boundary_wsyyd);
-      l2Norm_wsyyd[i][j] = norm.first;
-      semiNorm_wsyyd[i][j] = norm.second;
-
-
-      VTKWriter vtkIO(&mlSol);
-      vtkIO.Write("test", Files::_application_output_directory, "biquadratic", {"All"}, i);
+    // ======= Init ==========================
+    FemusInit mpinit(argc, args, MPI_COMM_WORLD);
+
+    // ======= Problem ========================
+    MultiLevelProblem ml_prob;
+
+    // ======= Files - BEGIN =========================
+    Files files;
+    const bool use_output_time_folder = false;
+    const bool redirect_cout_to_file = false;
+    files.CheckIODirectories(use_output_time_folder);
+    files.RedirectCout(redirect_cout_to_file);
+    ml_prob.SetFilesHandler(&files);
+    // ======= Files - END =========================
+
+    // ======= Mesh, Coarse, file - BEGIN ========================
+    MultiLevelMesh ml_mesh;
+    const std::string relative_path_to_build_directory = "../../../../../../";
+    const std::string input_file_path = relative_path_to_build_directory + Files::mesh_folder_path() + "00_salome/2d/square/minus0p5-plus0p5_minus0p5-plus0p5/";
+    const std::string input_mesh_filename = "square_-0p5-0p5x-0p5-0p5_divisions_2x2.med";
+    const std::string input_file_total = input_file_path + input_mesh_filename;
+
+    ml_mesh.ReadCoarseMesh(input_file_total);
+    // ======= Mesh, Coarse, file - END =======================
+
+    // ======= Quad Rule - BEGIN ========================
+    std::string fe_quad_rule("seventh");
+    ml_prob.SetQuadratureRuleAllGeomElems(fe_quad_rule);
+    ml_prob.set_all_abstract_fe_AD_or_not();
+    // ======= Quad Rule - END ========================
+
+    // ======= Convergence study setup - BEGIN ========================
+    unsigned max_number_of_meshes = 5;
+
+        if (ml_mesh.GetDimension() == 3) max_number_of_meshes = 6;
+
+    // Auxiliary mesh for incremental refinement
+    MultiLevelMesh ml_mesh_all_levels_Needed_for_incremental;
+    ml_mesh_all_levels_Needed_for_incremental.ReadCoarseMesh(input_file_total);
+
+    // Solution generation class
+    Solution_generation_StressBased< double > my_solution_generation;
+
+    const bool my_solution_generation_has_equation_solve = true;
+
+    // ======= Unknowns - BEGIN ========================
+    std::vector< Unknown > unknowns(12); // Twelve unknowns
+    std::vector<std::string> unknown_names = {
+        "u", "sxx", "sxy", "syy",
+        "ud", "sxxd", "sxyd", "syyd",
+        "w", "wsxxd", "wsxyd", "wsyyd"
+    };
+    std::vector<Math::Function<double>*> analytical_functions = {
+        &analytical_u_solution, &analytical_sxx_solution, &analytical_sxy_solution, &analytical_syy_solution,
+        &analytical_ud_solution, &analytical_sxxd_solution, &analytical_sxyd_solution, &analytical_syyd_solution,
+        &analytical_w_solution, &analytical_wsxxd_solution, &analytical_wsxyd_solution, &analytical_wsyyd_solution
+    };
+
+ FEOrder fe_orders[] = { FIRST, SERENDIPITY, SECOND };
+   unsigned num_orders = 3;
+
+
+ for (unsigned o_idx = 0; o_idx < num_orders; o_idx++) {
+    FEOrder current_order = fe_orders[o_idx];
+
+    for (unsigned u_idx = 0; u_idx < 12; u_idx++) {
+        unknowns[u_idx]._name = unknown_names[u_idx];
+        unknowns[u_idx]._fe_family = LAGRANGE;
+        unknowns[u_idx]._fe_order = current_order; // Can be varied in convergence study
+        unknowns[u_idx]._time_order = 0;
+        unknowns[u_idx]._is_pde_unknown = true;
     }
-  }
-  // ======= Convergence study, mesh loop and FE loop - END =========================
 
 
-  // ======= Convergence study, print convergence rate - BEGIN =========================
-  auto print_error = [](const std::vector<std::vector<double>>& error, const std::string& title) {
-    std::cout << "\n" << title << "\nLEVEL\tFIRST\t\t\tSERENDIPITY\t\tSECOND\n";
-    for (unsigned i = 0; i < error.size(); ++i) {
-      std::cout << i + 1 << "\t";
-      for (auto val : error[i]) std::cout << val << "\t";
-      std::cout << "\n";
-      if (i < error.size() - 1) {
-        std::cout << "\t\t";
-        for (unsigned j = 0; j < error[i].size(); ++j) {
-          std::cout << log(error[i][j] / error[i + 1][j]) / log(2.) << "\t\t\t";
-        }
-        std::cout << "\n";
-      }
+    // ======= Unknowns - END ========================
+
+    // ======= Unknowns, Analytical functions - BEGIN ================
+    std::vector< Math::Function< double > * > unknowns_analytical_functions_Needed_for_absolute(unknowns.size());
+    for (unsigned u_idx = 0; u_idx < unknowns.size(); u_idx++) {
+        unknowns_analytical_functions_Needed_for_absolute[u_idx] = analytical_functions[u_idx];
     }
-  };
+    // ======= Unknowns, Analytical functions - END ================
 
-  print_error(l2Norm_u, "L2 ERROR for u");
-  print_error(semiNorm_u, "H1 ERROR for u");
-  print_error(l2Norm_sxx, "L2 ERROR for sxx");
-  print_error(semiNorm_sxx, "H1 ERROR for sxx");
-  print_error(l2Norm_sxy, "L2 ERROR for sxy");
-  print_error(semiNorm_sxy, "H1 ERROR for sxy");
-  print_error(l2Norm_syy, "L2 ERROR for syy");
-  print_error(semiNorm_syy, "H1 ERROR for syy");
+    // ======= System Specifics for Stress-Based Problem - BEGIN ==================
+    system_specifics app_specs;
+    app_specs._system_name = "StressBasedOptimalControl";
+    app_specs._assemble_function = System_assemble_interface_StressBased<LinearImplicitSystem, double, double>;
+    app_specs._assemble_function_for_rhs = &source_function;
+    app_specs._true_solution_function = &analytical_u_solution;
+    app_specs._boundary_conditions_types_and_values = SetBoundaryCondition_bc_all_dirichlet_homogeneous;
+    ml_prob.set_app_specs_pointer(&app_specs);
+    // ======= System Specifics for Stress-Based Problem - END ==================
 
-  print_error(l2Norm_ud, "L2 ERROR for ud");
-  print_error(semiNorm_ud, "H1 ERROR for ud");
-  print_error(l2Norm_sxxd, "L2 ERROR for sxxd");
-  print_error(semiNorm_sxxd, "H1 ERROR for sxxd");
-  print_error(l2Norm_sxyd, "L2 ERROR for sxyd");
-  print_error(semiNorm_sxyd, "H1 ERROR for sxyd");
-  print_error(l2Norm_syyd, "L2 ERROR for syyd");
-  print_error(semiNorm_syyd, "H1 ERROR for syyd");
+    // Various choices for convergence study
+    std::vector < bool > convergence_rate_computation_method_Flag = {true, false};
+    std::vector < bool > volume_or_boundary_Flag = {true, false};
+    std::vector < bool > sobolev_norms_Flag = {true, true};
 
-  print_error(l2Norm_w, "L2 ERROR for w");
-  print_error(semiNorm_w, "H1 ERROR for w");
-  print_error(l2Norm_wsxxd, "L2 ERROR for wsxxd");
-  print_error(semiNorm_wsxxd, "H1 ERROR for wsxxd");
-  print_error(l2Norm_wsxyd, "L2 ERROR for wsxyd");
-  print_error(semiNorm_wsxyd, "H1 ERROR for wsxyd");
-  print_error(l2Norm_wsyyd, "L2 ERROR for wsyyd");
-  print_error(semiNorm_wsyyd, "H1 ERROR for wsyyd");
+    // ======= Perform Convergence Study ========================
+    FE_convergence<>::convergence_study(
+        ml_prob,
+        ml_mesh,
+        &ml_mesh_all_levels_Needed_for_incremental,
+        max_number_of_meshes,
+        convergence_rate_computation_method_Flag,
+        volume_or_boundary_Flag,
+        sobolev_norms_Flag,
+        my_solution_generation_has_equation_solve,
+        my_solution_generation,
+        unknowns,
+        unknowns_analytical_functions_Needed_for_absolute,
+        Solution_set_initial_conditions,
+        SetBoundaryCondition_bc_all_dirichlet_homogeneous
+    );
+ }
 
-  return 0;
+    return 0;
 }
