@@ -42,9 +42,25 @@ using namespace femus;
 //  Regularization parameters (file scope, mirroring the distributed-control
 //  nonauto convention).  Adjust here only.
 // =============================================================================
-static constexpr double alpha_0 = 0.00000000001;
-static constexpr double alpha_1 = 0.00000000001;
+static constexpr double alpha_0 = 0.00001;
+static constexpr double alpha_1 = 0.00001;
 static constexpr double alpha_2 = 0.00001;
+
+// =============================================================================
+//  Accumulators for the cost-functional decomposition (filled during the volume
+//  assembly; whole-domain experiment, so Omega_t = Omega_c = Omega).  They store
+//  the RAW half-seminorms; the alpha weights are applied when J is reported:
+//      g_Jfun_track =  1/2 \int_{Omega_t} (u~ + w - u_d)^2
+//      g_Jfun_w_L2  =  1/2 \int_{Omega_c} w^2
+//      g_Jfun_w_H1  =  1/2 \int_{Omega_c} |grad w|^2
+//      g_Jfun_sigw  =  1/2 \int_{Omega_c} ||sigma_w||_F^2  (sigma_w = Hessian of w)
+//  They are reset at the start of every assembly pass, so reading them right
+//  after a post-solve assembly call gives J at the converged solution.
+// =============================================================================
+static double g_Jfun_track = 0.0;
+static double g_Jfun_w_L2  = 0.0;
+static double g_Jfun_w_H1  = 0.0;
+static double g_Jfun_sigw  = 0.0;
 
 
 namespace karthik {
@@ -934,6 +950,12 @@ static void AssembleBilaplaceProblem_AD(
     RES->zero();
     if (assembleMatrix) KK->zero();
 
+    // reset the cost-functional accumulators for this assembly pass
+    g_Jfun_track = 0.0;
+    g_Jfun_w_L2  = 0.0;
+    g_Jfun_w_H1  = 0.0;
+    g_Jfun_sigw  = 0.0;
+
 
     constexpr unsigned int space_dim = 2; // max spatial dimension
     const unsigned int dim_offset_grad = dim;
@@ -1212,6 +1234,31 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
             const real_num_mov f_val = (real_num_mov) source_functions[0]->value(x_gss);
 
 
+            // ---- cost-functional decomposition (whole domain: Omega_t=Omega_c=Omega) ----
+            //  Uses the values already interpolated at this Gauss point:
+            //  u_val_g (= u~), w_val_g, grad_w_g, the control curvature components
+            //  wsxxd/wsxyd/wsyyd (= sigma_w), f_val (= target u_d), weight_qp.
+            {
+                const double Uval = (double)(u_val_g + w_val_g);     // tracked state U = u~ + w
+                const double uD   = (double) f_val;                  // target u_d
+                g_Jfun_track += 0.5 * (Uval - uD) * (Uval - uD) * (double) weight_qp;
+
+                g_Jfun_w_L2  += 0.5 * (double)(w_val_g * w_val_g) * (double) weight_qp;
+
+                double gradw_sq = 0.0;
+                for (unsigned d = 0; d < dim_offset_grad; ++d)
+                    gradw_sq += (double)(grad_w_g[d] * grad_w_g[d]);
+                g_Jfun_w_H1  += 0.5 * gradw_sq * (double) weight_qp;
+
+                // Frobenius norm of the symmetric Hessian sigma_w:
+                //   ||sigma_w||_F^2 = sxx^2 + 2 sxy^2 + syy^2
+                const double sigw_sq = (double)( wsxxd_val_g * wsxxd_val_g
+                                               + 2.0 * wsxyd_val_g * wsxyd_val_g
+                                               + wsyyd_val_g * wsyyd_val_g );
+                g_Jfun_sigw  += 0.5 * sigw_sq * (double) weight_qp;
+            }
+
+
             // ==================== RESIDUAL AND JACOBIAN CALCULATIONS ====================
 
 // Test functions for R_u (first equation):  div(sigma + sigma_w) = 0   (no source: f = 0)
@@ -1219,6 +1266,9 @@ for (unsigned a = 0; a < nDofs_wsyyd; ++a) {
 //              +  d_y phi_u_i * syy_y
 //              +  d_x phi_u_i * wsxxd_x  +  d_x phi_u_i * wsxyd_y  +  d_y phi_u_i * wsxyd_x
 //              +  d_y phi_u_i * wsyyd_y ] dOmega
+
+// ==========================================================================================
+
 for (unsigned i = 0; i < nDofs_u; ++i) {
 
     real_num_mov div_sigma = 0.0;

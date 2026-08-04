@@ -26,7 +26,7 @@
 #include "FE_convergence.hpp"
 
 #include "Solution_functions_over_domains_or_mesh_files.hpp"
-
+#include <iomanip>
 #include "adept.h"
 // // // extern Domains::square_m05p05::Function_Zero_on_boundary_4<double> analytical_function;
 
@@ -977,63 +977,58 @@ bool SetBoundaryCondition_bc_all_dirichlet_homogeneous(
     const int facename,
     const double time)
 {
-    // Primal / adjoint / control: pull from analytical (zero for u, ud;
-    // g(x)q(y) for w via Function_W_Lifting)
+    (void) ml_prob; (void) facename; (void) time;
+
+    // ----------------------------------------------------------------------
+    //  EXPERIMENT (a):  w FREE (natural) on ALL four sides -- control acts over
+    //  the whole boundary.  u~ and the adjoint ud are homogeneous Dirichlet;
+    //  the sigma-Hessian variables are natural.  Target u_d = 1.
+    //  Whole domain: Omega_t = Omega_c = Omega.
+    // ----------------------------------------------------------------------
     if (!strcmp(SolName, "u") ||
         !strcmp(SolName, "ud"))
     {
-        Math::Function<double>* exact_sol =
-            ml_prob->get_ml_solution()->get_analytical_function(SolName);
-        Value = exact_sol->value(x);
-        return true;
-    }
-
-    // Sigma-Hessian variables (state, adjoint, control):
-    // homogeneous Dirichlet to anchor the Hessian-recovery sub-systems.
-// // //     if (!strcmp(SolName, "sxx")   || !strcmp(SolName, "sxy")   || !strcmp(SolName, "syy")   ||
-// // //         !strcmp(SolName, "sxxd")  || !strcmp(SolName, "sxyd")  || !strcmp(SolName, "syyd")  ||
-// // //         !strcmp(SolName, "wsxxd") || !strcmp(SolName, "wsxyd") || !strcmp(SolName, "wsyyd"))
-// // //     {
-// // // // // //         Value = 0.0;
-// // //         Math::Function<double>* exact_sol =
-// // //             ml_prob->get_ml_solution()->get_analytical_function(SolName);
-// // //         Value = exact_sol->value(x);
-// // //         return true;
-// // //     }
-
- // // // if (!strcmp(SolName, "w"))
- // // //    {
- // // //        // facename == 2 is the right boundary for the square_-0p5-0p5 mesh
- // // //        // (check your .med file if this index is different)
- // // //        if (facename == 2)
- // // //        {
- // // //            Math::Function<double>* f =
- // // //                ml_prob->get_ml_solution()->get_analytical_function(SolName);
- // // //            Value = f->value(x);
- // // //            return true;   // Dirichlet, nonhomogeneous
- // // //        }
- // // //        else
- // // //        {
- // // //            Value = 0.0;
- // // //            return true;   // Dirichlet, homogeneous on other faces
- // // //        }
- // // //    }
-
-    if (!strcmp(SolName, "w"))
-{
-    if (std::abs(x[0] - 0.5) < 1.e-10)   // right side: x = +0.5
-    {
-        Value = 1.0;
-        return true;   // Dirichlet, nonhomogeneous
-    }
-    else
-    {
         Value = 0.0;
-        return false;   // natural BC on all other sides
+        return true;                       // homogeneous Dirichlet
     }
-}
 
-    // Fallback (should not be hit if all 12 names handled above)
+    // this is to fix w =1 on the right side of the domain's boundary
+
+
+
+    //this is for the subregion
+    // // // if (!strcmp(SolName, "w"))
+    // // // {
+    // // //     // // // // // if (std::abs(x[0] - 0.5) < 1.e-10) // right edge x = +1/2
+    // // //
+    // // //     if (/*std::abs(x[0] - 0.5) < 1.e-10 &&*/ (x[0] >= 0.25 - 1e-10) && (x[0] <= 0.5 + 1e-10) &&
+    // // //         x[1] >= -0.25 - 1.e-10 &&
+    // // //         x[1] <= 0.25 + 1.e-10)
+    // // //
+    // // //     {
+    // // //         Value = 1.0;
+    // // //         return true;                   // Dirichlet, prescribed lift w = 1
+    // // //     }
+    // // //     else {
+    // // //     Value = 0.0;
+    // // //     return false;                      // natural on the other three edges
+    // // //     }
+    // // // }
+   if (!strcmp(SolName, "w"))
+    {
+        if (std::abs(x[0] - 0.5) < 1.e-10) // Right boundary edge x = +1/2
+        {
+            Value = 1.0;
+            return true;                   // Dirichlet: Prescribed lift w = 1
+        }
+        else
+        {
+            Value = 0.0;
+            return false;                  // Natural on the other three edges
+        }
+    }
+
+    // w and all sigma-Hessian variables: NATURAL (no Dirichlet)
     Value = 0.0;
     return false;
 }
@@ -1141,6 +1136,50 @@ const MultiLevelSolution Solution_generation_StressBased< real_num >::run_on_sin
             system.AddVariableToBeSolved("All");
             system.SetOuterSolver(PREONLY);
             system.MGsolve();
+
+            // ---------------------------------------------------------------
+            //  COST-FUNCTIONAL DECOMPOSITION
+            //  Re-run the assembly ONCE on the converged solution (no solve)
+            //  so the term accumulators in the .hpp are evaluated at u~,w,sigma_w
+            //  rather than at the initial guess.  This rebuilds the matrix
+            //  (harmless, we do not solve again) and is cheap for a single run.
+            // ---------------------------------------------------------------
+            System_assemble_interface_StressBased< LinearImplicitSystem, real_num, double >(ml_prob);
+
+            {
+                const double J_track = g_Jfun_track;          // 1/2||u~+w-u_d||^2_Ot
+                const double J_w0    = g_Jfun_w_L2;            // 1/2||w||^2_Oc
+                const double J_w1    = g_Jfun_w_H1;            // 1/2||grad w||^2_Oc
+                const double J_w2    = g_Jfun_sigw;            // 1/2||sigma_w||^2_Oc
+                const double a0J     = alpha_0 * J_w0;
+                const double a1J     = alpha_1 * J_w1;
+                const double a2J     = alpha_2 * J_w2;
+                const double J_tot   = J_track + a0J + a1J + a2J;
+
+                std::cout << "\n==================== FUNCTIONAL DECOMPOSITION ====================\n";
+
+                std::ios_base::fmtflags old_flags = std::cout.flags();
+                std::streamsize        old_prec  = std::cout.precision();
+                std::cout << std::scientific << std::setprecision(15);
+
+                std::cout << "  alpha_0 = " << alpha_0
+                          << " , alpha_1 = " << alpha_1
+                          << " , alpha_2 = " << alpha_2 << "\n";
+                std::cout << "  tracking   1/2||u~+w-u_d||^2  = " << J_track << "\n";
+                std::cout << "  raw 1/2||w||^2                = " << J_w0
+                          << "   (weighted alpha_0* = " << a0J << ")\n";
+                std::cout << "  raw 1/2||grad w||^2           = " << J_w1
+                          << "   (weighted alpha_1* = " << a1J << ")\n";
+                std::cout << "  raw 1/2||sigma_w||^2          = " << J_w2
+                          << "   (weighted alpha_2* = " << a2J << ")\n";
+                std::cout << "  ----------------------------------------------------------------\n";
+                std::cout << "  TOTAL  J = " << J_tot << "\n";
+
+                std::cout.flags(old_flags);          // restore previous formatting
+                std::cout.precision(old_prec);
+
+                std::cout << "==================================================================\n" << std::endl;
+            }
         }
 
             // Print Solutions to VTK
